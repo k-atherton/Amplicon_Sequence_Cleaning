@@ -1,0 +1,11 @@
+# Ignore data files
+*.csv
+*.RDS
+*.txt
+*.fasta
+*.tsv
+01_DADA2/*/intermediate/*
+
+# Ignore figures
+*.png
+*.pdf

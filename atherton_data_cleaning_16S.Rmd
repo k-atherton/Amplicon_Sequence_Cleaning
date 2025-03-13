@@ -1,0 +1,3013 @@
+---
+title: "Street Tree Decontamination"
+author: "Kathryn Atherton"
+date: "2024-05-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(sva)
+library(pamr)
+library(limma)
+library(robCompositions)
+library(vegan)
+library(ggplot2)
+library(decontam)
+library(phyloseq)
+library(dplyr)
+library(data.table)
+library(compositions)
+library(tidyr)
+library(fungaltraits)
+library(readxl)
+```
+
+```{r load data}
+# load sequencing data
+nr1 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_NR1_trunc/ST_16S_NR1_trunc_ASV.tsv")
+nr2 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_NR2_trunc/ST_16S_NR2_trunc_ASV.tsv")
+r1 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run1/ST_16S_Run1_ASV.tsv")
+r2 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run2/ST_16S_Run2_ASV.tsv")
+r3 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run3/ST_16S_Run3_ASV.tsv")
+r4 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run4/ST_16S_Run4_ASV.tsv")
+r5 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run5/ST_16S_Run5_ASV.tsv")
+r6 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run6/ST_16S_Run6_ASV.tsv")
+rerun <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_ReRun/ST_16S_ReRun_ASV.tsv")
+
+# rename ASV column in sequencing data
+colnames(nr1)[1] <- "ASV"
+colnames(nr2)[1] <- "ASV"
+colnames(r1)[1] <- "ASV"
+colnames(r2)[1] <- "ASV"
+colnames(r3)[1] <- "ASV"
+colnames(r4)[1] <- "ASV"
+colnames(r5)[1] <- "ASV"
+colnames(r6)[1] <- "ASV"
+colnames(rerun)[1] <- "ASV"
+
+# create dataframe of all sequence data
+d16s <- merge(nr1, nr2, by = "ASV", all = TRUE)
+d16s <- merge(d16s, r1, by = "ASV", all = TRUE)
+d16s <- merge(d16s, r2, by = "ASV", all = TRUE)
+d16s <- merge(d16s, r3, by = "ASV", all = TRUE)
+d16s <- merge(d16s, r4, by = "ASV", all = TRUE)
+d16s <- merge(d16s, r5, by = "ASV", all = TRUE)
+d16s <- merge(d16s, r6, by = "ASV", all = TRUE)
+d16s <- merge(d16s, rerun, by = "ASV", all = TRUE)
+
+# change NA to 0 in sequence data
+d16s[is.na(d16s)] <- 0
+
+# make ASV names rownames, remove ASV column
+rownames(d16s) <- d16s$ASV
+d16s <- d16s[,-1]
+
+# import taxonomy tables
+tax_nr1 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_NR1_trunc/ST_16S_NR1_trunc_consensus.tsv")
+tax_nr2 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_NR2_trunc/ST_16S_NR2_trunc_consensus.tsv")
+tax_r1 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run1/ST_16S_Run1_consensus.tsv")
+tax_r2 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run2/ST_16S_Run2_consensus.tsv")
+tax_r3 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run3/ST_16S_Run3_consensus.tsv")
+tax_r4 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run4/ST_16S_Run4_consensus.tsv")
+tax_r5 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run5/ST_16S_Run5_consensus.tsv")
+tax_r6 <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_Run6/ST_16S_Run6_consensus.tsv")
+tax_rerun <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/dada2_output/16S_ReRun/ST_16S_ReRun_consensus.tsv")
+
+# keep only the taxonomy information
+tax_nr1 <- tax_nr1[,c(1,2)]
+tax_nr2 <- tax_nr2[,c(1,2)]
+tax_r1 <- tax_r1[,c(1,2)]
+tax_r2 <- tax_r2[,c(1,2)]
+tax_r3 <- tax_r3[,c(1,2)]
+tax_r4 <- tax_r4[,c(1,2)]
+tax_r5 <- tax_r5[,c(1,2)]
+tax_r6 <- tax_r6[,c(1,2)]
+tax_rerun <- tax_r6[,c(1,2)]
+
+
+# make one taxonomy table
+tax <- merge(tax_nr1, tax_nr2, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_r1, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_r2, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_r3, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_r4, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_r5, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_r6, by = c("Feature ID", "Taxon"), all = TRUE)
+tax <- merge(tax, tax_rerun, by = c("Feature ID", "Taxon"), all = TRUE)
+
+# separate the taxonomy information into ranks
+names <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+split_taxa <- stringr::str_split(tax$Taxon, pattern = ";")
+taxa_names <- lapply(split_taxa, function(x) x[1:length(names)])
+tax_table <- taxa_names %>%
+  unlist() %>% matrix(ncol = length(names), byrow = TRUE) %>%
+  data.frame() %>%
+  magrittr::set_colnames(names) %>%
+  #tidyr::unite("Species", "Species", "Species2") %>%
+  mutate(Genus = replace(Genus, 
+                         Genus == "Escherichia-Shigella", "Escherichia"))
+
+# add taxonomic ranks back to taxon table, remove column with ranks as one string
+tax <- cbind(tax, tax_table)
+tax <- tax[,-2]
+
+# make Feature ID the rownames, remove column
+rownames(tax) <- tax[,1]
+tax <- tax[,-1]
+
+# remove non-fungi from the 16S file
+d16s <- d16s[which(rownames(d16s) %in% rownames(tax)),]
+
+# # write files to csv
+#write.csv(d16s, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/raw_16s_allruns.csv")
+#write.csv(tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/tax_16s_allruns.csv")
+```
+
+```{r record dada2 processing to metadata}
+rm(list = ls())
+# load metadata
+metadata_16s_all <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Data/metadata_16s_200.csv")
+d16s <- vroom::vroom("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/raw_16s_allruns.csv")
+d16s <- as.data.frame(d16s)
+rownames(d16s) <- d16s[,1]
+d16s <- d16s[,-1]
+# # 
+# # # # add is.control column
+# # # metadata_16s$is_control <- FALSE
+# # # metadata_16s$is_control[which(metadata_16s$sample_type == "Negative Control")] <- TRUE
+# # # 
+# # # add the post-dada2 processing sequence counts
+dada2_seq_count <- colSums(d16s)
+
+# record sequence counts in metadata table
+for(i in 1:length(dada2_seq_count)){
+  sample_name <- names(dada2_seq_count)[i]
+  metadata_16s_all$seq_count_dada2[which(metadata_16s_all$sample_name == sample_name)] <- dada2_seq_count[i]
+}
+# 
+# # for(i in 1:nrow(metadata_16s)){
+# #   sample <- names(decontam_sample_sums)[i]
+# #   metadata_16s$seq_count_decontam[which(metadata_16s$sample_name == sample)] <- decontam_sample_sums[i]
+# # }
+# # 
+# # # write this data to the file
+write.csv(metadata_16s_all,
+          "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Data/metadata_16s_new.csv",
+          row.names = FALSE)
+
+# remove samples without sequencing data
+metadata_16s <- metadata_16s_all[!is.na(metadata_16s_all$sample_name),]
+
+# make data factors
+metadata_16s$sequencing_batch <- as.factor(metadata_16s$sequencing_batch)
+metadata_16s$tree_id <- as.factor(metadata_16s$tree_id)
+metadata_16s$site_name <- as.factor(metadata_16s$site_name)
+metadata_16s$plot_name <- as.factor(metadata_16s$plot_name)
+metadata_16s$tree_pit_type <- as.factor(metadata_16s$tree_pit_type)
+metadata_16s$tree_type <- as.factor(metadata_16s$tree_type)
+metadata_16s$study_system <- as.factor(metadata_16s$study_system)
+metadata_16s$tree_species <- as.factor(metadata_16s$tree_species)
+metadata_16s$tree_age <- as.factor(metadata_16s$tree_age)
+```
+
+```{r phyloseq}
+d16s <- as.matrix(read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/raw_16s_allruns.csv", 
+                           row.names = 1))
+d16s <- d16s[,which(colnames(d16s) %in% metadata_16s$sample_name)]
+tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/tax_16s_allruns.csv", 
+                          row.names = 1)
+
+# make phyloseq objects
+tax <- tax_table(tax)
+d16s <- otu_table(d16s, taxa_are_rows = TRUE)
+
+ps <- phyloseq(d16s, tax)
+
+meta <- as.data.frame(metadata_16s)
+rownames(meta) <- meta$sample_name
+meta <- meta[,-1]
+
+meta <- sample_data(meta)
+
+ps_meta <- merge_phyloseq(ps, meta)
+```
+
+```{r break into sample types}
+# make leaf dataset
+ps_leaf <- subset_samples(ps_meta, sample_type == "Leaf")
+# add leaf negative controls
+leaf <- c("neg_control_1_16S", "neg_control_2_16S", "leaf_1", "leaf_2", 
+          "leaf_3", "leaf_4", "leaf_5", "leaf_6")
+leaf_nc <- colnames(d16s)[grep(paste(leaf, collapse = "|"), colnames(d16s))]
+ps_leaf_nc <- subset_samples(ps_meta, sample_names(ps_meta) %in% leaf_nc)
+ps_leaf_w_nc <- merge_phyloseq(ps_leaf, ps_leaf_nc)
+
+# make root dataframe
+ps_root <- subset_samples(ps_meta, sample_type == "Root")
+# add root negative controls
+root <- c("1_root", "2_root", "root_1", "root_2", "root_3", "root_4", "root_5", 
+          "root_6")
+root_nc <- colnames(d16s)[grep(paste(root, collapse = "|"), colnames(d16s))]
+ps_root_nc <- subset_samples(ps_meta, sample_names(ps_meta) %in% root_nc)
+ps_root_w_nc <- merge_phyloseq(ps_root, ps_root_nc)
+
+# make M soil data frame
+ps_m <- subset_samples(ps_meta, (sample_type == "Soil") & (soil_horizon == "M"))
+# add M soil negative controls
+M <- c("neg_control_1_16S", "neg_control_2_16S", "neg_control_M_1", 
+       "neg_control_M_2", "neg_control_M_3", "neg_control_M_4", 
+       "neg_control_M_5", "neg_control_M_6")
+m_nc <- colnames(d16s)[grep(paste(M, collapse = "|"), colnames(d16s))]
+ps_m_nc <- subset_samples(ps_meta, sample_names(ps_meta) %in% m_nc)
+ps_m_w_nc <- merge_phyloseq(ps_m, ps_m_nc)
+# 
+# make O soil data frame
+ps_o <- subset_samples(ps_meta, (sample_type == "Soil") & (soil_horizon == "O"))
+# add O soil negative controls
+O <- c("neg_control_1_soil", "neg_control_2_soil", "neg_control_O_1", 
+       "neg_control_O_2", "neg_control_O_3", "neg_control_O_4", 
+       "neg_control_O_5", "neg_control_O_6", "neg_control_o_rerun1_1", 
+       "neg_control_o_rerun1_2", "neg_control_o_rerun2_1", 
+       "neg_control_o_rerun2_2")
+o_nc <- colnames(d16s)[grep(paste(O, collapse = "|"), colnames(d16s))]
+ps_o_nc <- subset_samples(ps_meta, sample_names(ps_meta) %in% o_nc)
+ps_o_w_nc <- merge_phyloseq(ps_o, ps_o_nc)
+
+# save as data frames
+leaf_raw <- as.data.frame(as.matrix(ps_leaf@otu_table))
+leaf_raw_tax <- as.data.frame(as.matrix(ps_leaf@tax_table))
+root_raw <- as.data.frame(as.matrix(ps_root@otu_table))
+root_raw_tax <- as.data.frame(as.matrix(ps_root@tax_table))
+m_raw <- as.data.frame(as.matrix(ps_m@otu_table))
+m_raw_tax <- as.data.frame(as.matrix(ps_m@tax_table))
+o_raw <- as.data.frame(as.matrix(ps_o@otu_table))
+o_raw_tax <- as.data.frame(as.matrix(ps_o@tax_table))
+
+# # write to SCC
+# #write.csv(leaf_raw, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/leaf_16s_asv_raw.csv")
+# #write.csv(root_raw, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/root_16s_asv_raw.csv")
+# #write.csv(m_raw, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/m_16s_asv_raw.csv")
+# #write.csv(o_raw, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/o_16s_asv_raw.csv")
+# 
+# #write.csv(leaf_raw_tax, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/leaf_16s_tax_raw.csv")
+# #write.csv(root_raw_tax, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/root_16s_tax_raw.csv")
+# #write.csv(m_raw_tax, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/m_16s_tax_raw.csv")
+# #write.csv(o_raw_tax, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/o_16s_tax_raw.csv")
+```
+
+```{r test for sequence depth influence}
+# make data frames
+leaf_meta <- as.data.frame(as.matrix(ps_leaf@sam_data))
+root_meta <- as.data.frame(as.matrix(ps_root@sam_data))
+m_meta <- as.data.frame(as.matrix(ps_m@sam_data))
+o_meta <- as.data.frame(as.matrix(ps_o@sam_data))
+
+# make sequencing depth numeric
+leaf_meta$seq_count_dada2 <- as.numeric(leaf_meta$seq_count_dada2)
+root_meta$seq_count_dada2 <- as.numeric(root_meta$seq_count_dada2)
+m_meta$seq_count_dada2 <- as.numeric(m_meta$seq_count_dada2)
+o_meta$seq_count_dada2 <- as.numeric(o_meta$seq_count_dada2)
+
+# bin sequencing depth
+leaf_meta$seq_bin <- NA
+root_meta$seq_bin <- NA
+m_meta$seq_bin <- NA
+o_meta$seq_bin <- NA
+
+for(i in 1:nrow(leaf_meta)){
+  depth <- leaf_meta$seq_count_dada2[i]
+  if(depth < 10000){
+    leaf_meta$seq_bin[i] <- "0-10k"
+  } else if(depth < 20000){
+    leaf_meta$seq_bin[i] <- "10-20k"
+  } else if(depth < 30000){
+    leaf_meta$seq_bin[i] <- "20-30k"
+  } else if(depth < 40000){
+    leaf_meta$seq_bin[i] <- "30-40k"
+  } else if(depth < 50000){
+    leaf_meta$seq_bin[i] <- "40-50k"
+  } else if(depth < 60000){
+    leaf_meta$seq_bin[i] <- "50-60k"
+  } else if(depth < 70000){
+    leaf_meta$seq_bin[i] <- "60-70k"
+  } else if(depth < 80000){
+    leaf_meta$seq_bin[i] <- "70-80k"
+  } else if(depth < 90000){
+    leaf_meta$seq_bin[i] <- "80-90k"
+  } else if(depth < 100000){
+    leaf_meta$seq_bin[i] <- "90-100k"
+  } else{
+    leaf_meta$seq_bin[i] <- "100k"
+  }
+}
+
+for(i in 1:nrow(root_meta)){
+  depth <- root_meta$seq_count_dada2[i]
+  if(depth < 10000){
+    root_meta$seq_bin[i] <- "0-10k"
+  } else if(depth < 20000){
+    root_meta$seq_bin[i] <- "10-20k"
+  } else if(depth < 30000){
+    root_meta$seq_bin[i] <- "20-30k"
+  } else if(depth < 40000){
+    root_meta$seq_bin[i] <- "30-40k"
+  } else if(depth < 50000){
+    root_meta$seq_bin[i] <- "40-50k"
+  } else if(depth < 60000){
+    root_meta$seq_bin[i] <- "50-60k"
+  } else if(depth < 70000){
+    root_meta$seq_bin[i] <- "60-70k"
+  } else if(depth < 80000){
+    root_meta$seq_bin[i] <- "70-80k"
+  } else if(depth < 90000){
+    root_meta$seq_bin[i] <- "80-90k"
+  } else if(depth < 100000){
+    root_meta$seq_bin[i] <- "90-100k"
+  } else{
+    root_meta$seq_bin[i] <- "100k"
+  }
+}
+
+for(i in 1:nrow(m_meta)){
+  depth <- m_meta$seq_count_dada2[i]
+  if(depth < 10000){
+    m_meta$seq_bin[i] <- "0-10k"
+  } else if(depth < 20000){
+    m_meta$seq_bin[i] <- "10-20k"
+  } else if(depth < 30000){
+    m_meta$seq_bin[i] <- "20-30k"
+  } else if(depth < 40000){
+    m_meta$seq_bin[i] <- "30-40k"
+  } else if(depth < 50000){
+    m_meta$seq_bin[i] <- "40-50k"
+  } else if(depth < 60000){
+    m_meta$seq_bin[i] <- "50-60k"
+  } else if(depth < 70000){
+    m_meta$seq_bin[i] <- "60-70k"
+  } else if(depth < 80000){
+    m_meta$seq_bin[i] <- "70-80k"
+  } else if(depth < 90000){
+    m_meta$seq_bin[i] <- "80-90k"
+  } else if(depth < 100000){
+    m_meta$seq_bin[i] <- "90-100k"
+  } else{
+    m_meta$seq_bin[i] <- "100k"
+  }
+}
+
+for(i in 1:nrow(o_meta)){
+  depth <- o_meta$seq_count_dada2[i]
+  if(depth < 10000){
+    o_meta$seq_bin[i] <- "0-10k"
+  } else if(depth < 20000){
+    o_meta$seq_bin[i] <- "10-20k"
+  } else if(depth < 30000){
+    o_meta$seq_bin[i] <- "20-30k"
+  } else if(depth < 40000){
+    o_meta$seq_bin[i] <- "30-40k"
+  } else if(depth < 50000){
+    o_meta$seq_bin[i] <- "40-50k"
+  } else if(depth < 60000){
+    o_meta$seq_bin[i] <- "50-60k"
+  } else if(depth < 70000){
+    o_meta$seq_bin[i] <- "60-70k"
+  } else if(depth < 80000){
+    o_meta$seq_bin[i] <- "70-80k"
+  } else if(depth < 90000){
+    o_meta$seq_bin[i] <- "80-90k"
+  } else if(depth < 100000){
+    o_meta$seq_bin[i] <- "90-100k"
+  } else{
+    o_meta$seq_bin[i] <- "100k"
+  }
+}
+
+ggplot(leaf_meta, 
+       aes(as.numeric(seq_count_dada2), 
+           fill = sequencing_batch)) + 
+  geom_histogram(binwidth = 1000) + 
+  theme_bw() + 
+  ggtitle("Leaf Sequencing Depth") + 
+  geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), 
+             color="blue", 
+             linetype="dashed") + 
+  geom_vline(aes(xintercept=10000), 
+             color="red", 
+             linetype="dashed")
+
+ggplot(root_meta, 
+       aes(as.numeric(seq_count_dada2), 
+           fill = sequencing_batch)) + 
+  geom_histogram(binwidth = 1000) + 
+  theme_bw() + 
+  ggtitle("Root Sequencing Depth") + 
+  geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), 
+             color="blue", 
+             linetype="dashed") + 
+  geom_vline(aes(xintercept=10000), 
+             color="red", 
+             linetype="dashed")
+
+ggplot(m_meta, 
+       aes(as.numeric(seq_count_dada2), 
+           fill = sequencing_batch)) + 
+  geom_histogram(binwidth = 1000) + 
+  theme_bw() + 
+  ggtitle("M Soil Sequencing Depth") + 
+  geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), 
+             color="blue", linetype="dashed") + 
+  geom_vline(aes(xintercept=8000), 
+             color="red", 
+             linetype="dashed")
+
+ggplot(o_meta, 
+       aes(as.numeric(seq_count_dada2), 
+           fill = sequencing_batch)) + 
+  geom_histogram(binwidth = 1000) + 
+  theme_bw() + 
+  ggtitle("O Soil Sequencing Depth")+ 
+  geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), 
+             color="blue", 
+             linetype="dashed") + 
+  geom_vline(aes(xintercept=8000), 
+             color="red", 
+             linetype="dashed")
+```
+
+```{r leaves sequencing depth}
+### LEAF
+# drop outliers
+drop <- c("HF069_D3_small_L2_16S_S181", "HF04_QR_Y_edge_L1_16S_S115",
+          "HF06_QR_M_int_L2_16S_S114", "HF06_QR_M_int_L1_16S_S104",
+          "BM03_QR_Y_int_PS_L2_16S_S102", "AB_QR_M_1_L_1_16S_S8", 
+          "HF06_QR_O_edge_L2_16S_S145", "SW08_QR_M_int_L1_16S_S141", 
+          "HF06_QR_M_int_L3_16S_S153", "BB_QR_O_1_L2_16S_S253", 
+          "HF04_QR_M_int_L2_16S_S297")
+leaf_filter <- leaf_raw[,!colnames(leaf_raw) %in% drop]
+leaf_meta_filter <- leaf_meta[!rownames(leaf_meta) %in% drop,]
+
+# # make a transposed verison of the leaf sequencing data
+# d16s_leaf_t <- as.data.frame(t(leaf_filter))
+# 
+# # calculate Aitchison distance for leaf samples
+# aitch_leaf <- aDist(d16s_leaf_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_leaf <- as.matrix(aitch_leaf)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_leaf~as.factor(leaf_meta_filter$sequencing_batch))
+# adonis2(aitch_leaf~as.numeric(leaf_meta_filter$seq_count_dada2))
+# 
+# all.MDS_leaf<-metaMDS(aitch_leaf,k=2,zerodist="add")
+# leaf.coordinates<-data.frame(scores(all.MDS_leaf))
+# leaf.coordinates <- cbind(leaf.coordinates, leaf_meta_filter)
+# 
+# # plot samples by different variables
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(leaf.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+# 
+# ggplot(leaf.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Leaf Batch Effect")
+
+# # drop samples < 5000 reads
+# leaf_meta_5000 <- leaf_meta_filter[leaf_meta_filter$seq_count_dada2 > 5000,]
+# leaf_5000 <- leaf_filter[,colnames(leaf_filter) %in% rownames(leaf_meta_5000)]
+# # make a transposed verison of the leaf sequencing data
+# d16s_leaf_t <- as.data.frame(t(leaf_5000))
+# 
+# # calculate Aitchison distance for leaf samples
+# aitch_leaf <- aDist(d16s_leaf_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_leaf <- as.matrix(aitch_leaf)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_leaf~as.factor(leaf_meta_5000$sequencing_batch))
+# adonis2(aitch_leaf~as.numeric(leaf_meta_5000$seq_count_dada2))
+# 
+# all.MDS_leaf<-metaMDS(aitch_leaf,k=2,zerodist="add")
+# leaf.coordinates<-data.frame(scores(all.MDS_leaf))
+# leaf.coordinates <- cbind(leaf.coordinates, leaf_meta_5000)
+# 
+# # plot samples by different variables
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2)) + geom_text(label = rownames(leaf.coordinates), size = 2) + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(seq_bin))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_age))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_pit_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_species))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(site_name))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+ 
+# drop samples < 10000 reads
+leaf_meta_10000 <- leaf_meta_filter[leaf_meta_filter$seq_count_dada2 > 10000,]
+leaf_10000 <- leaf_filter[,colnames(leaf_filter) %in% rownames(leaf_meta_10000)]
+# # make a transposed verison of the leaf sequencing data
+# d16s_leaf_t <- as.data.frame(t(leaf_10000))
+# 
+# # calculate Aitchison distance for leaf samples
+# aitch_leaf <- aDist(d16s_leaf_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_leaf <- as.matrix(aitch_leaf)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_leaf~as.factor(leaf_meta_10000$sequencing_batch))
+# adonis2(aitch_leaf~as.numeric(leaf_meta_10000$seq_count_dada2))
+# 
+# all.MDS_leaf<-metaMDS(aitch_leaf,k=2,zerodist="add")
+# leaf.coordinates<-data.frame(scores(all.MDS_leaf))
+# leaf.coordinates <- cbind(leaf.coordinates, leaf_meta_10000)
+# 
+# # plot samples by different variables
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2)) + geom_text(label = rownames(leaf.coordinates), size = 2) + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(seq_bin))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_age))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_pit_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_species))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+# ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(site_name))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+
+# write new data to file
+# #write.csv(leaf_10000, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Filter_Samples/16S/leaf_16s_asv_filtersamples.csv")
+
+# subset the filtered samples out of the phyloseq
+ps_leaf <- subset_samples(ps_leaf, sample_names(ps_leaf) %in% colnames(leaf_10000))
+```
+
+```{r roots sequencing depth}
+### ROOT
+# drop samples for being outliers
+drop <- c("AA01_QR_Y_edge_R2_16S_S129", "HF06_QR_M_int_R2_16S_S124", 
+          "JP_QR_Y_pit_R2_16S_S195", "JP_QR_O_pit_R2_16S_S251", 
+          "HF04_QR_O_int_big_R1_16S_S183", "HF06_QR_O_edge_R2_16S_S138",
+          "HF04_QR_Y_edge_R1_16S_S185", "HF06_QR_O_edge_R1_16S_S191",
+          "HF06_QR_M_int_R1_16S_S120", "HF06_QR_Y_int_R1_16S_S196",
+          "HF04_QR_O_int_big_R2_16S_S120", "HF069_E3_765_R1_16S_S242")
+root_filter <- root_raw[,!colnames(root_raw) %in% drop]
+root_meta_filter <- root_meta[!rownames(root_meta) %in% drop,]
+
+# # make a transposed verison of the root sequencing data
+# d16s_root_t <- as.data.frame(t(root_filter))
+# 
+# # calculate Aitchison distance for root samples
+# aitch_root <- aDist(d16s_root_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_root <- as.matrix(aitch_root)
+# 
+# # test for sequencing batch effect
+# adonis2(aitch_root~as.factor(root_meta_filter$sequencing_batch))
+# adonis2(aitch_root~as.numeric(root_meta_filter$seq_count_dada2))
+# 
+# all.MDS_root<-metaMDS(aitch_root,k=2,zerodist="add")
+# root.coordinates<-data.frame(scores(all.MDS_root))
+# root.coordinates <- cbind(root.coordinates, root_meta_filter)
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(root.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(soil_horizon))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+
+# # drop samples < 5k sequences
+# root_meta_5000 <- root_meta_filter[root_meta_filter$seq_count_dada2 > 5000,]
+# root_5000 <- root_filter[,colnames(root_filter) %in% rownames(root_meta_5000)]
+# # make a transposed verison of the root sequencing data
+# d16s_root_t <- as.data.frame(t(root_5000))
+# 
+# # calculate Aitchison distance for root samples
+# aitch_root <- aDist(d16s_root_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_root <- as.matrix(aitch_root)
+# 
+# # test for sequencing batch effect
+# adonis2(aitch_root~as.factor(root_meta_5000$sequencing_batch))
+# adonis2(aitch_root~as.numeric(root_meta_5000$seq_count_dada2))
+# 
+# all.MDS_root<-metaMDS(aitch_root,k=2,zerodist="add")
+# root.coordinates<-data.frame(scores(all.MDS_root))
+# root.coordinates <- cbind(root.coordinates, root_meta_5000)
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(root.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(soil_horizon))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+
+# drop samples < 10k sequences
+root_meta_10000 <- root_meta_filter[root_meta_filter$seq_count_dada2 > 10000,]
+root_10000 <- root_filter[,colnames(root_filter) %in% rownames(root_meta_10000)]
+# # make a transposed verison of the root sequencing data
+# d16s_root_t <- as.data.frame(t(root_10000))
+# 
+# # calculate Aitchison distance for root samples
+# aitch_root <- aDist(d16s_root_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_root <- as.matrix(aitch_root)
+# 
+# # test for sequencing batch effect
+# adonis2(aitch_root~as.factor(root_meta_10000$sequencing_batch))
+# adonis2(aitch_root~as.numeric(root_meta_10000$seq_count_dada2))
+# 
+# all.MDS_root<-metaMDS(aitch_root,k=2,zerodist="add")
+# root.coordinates<-data.frame(scores(all.MDS_root))
+# root.coordinates <- cbind(root.coordinates, root_meta_10000)
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(root.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates,
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+# 
+# ggplot(root.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(soil_horizon))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("Root Batch Effect")
+
+# write new data to file
+# #write.csv(root_10000, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Filter_Samples/16S/root_16s_asv_filtersamples.csv")
+
+# subset the filtered samples out of the phyloseq
+ps_root <- subset_samples(ps_root, sample_names(ps_root) %in% colnames(root_10000))
+```
+
+```{r M soil sequencing depth}
+### M Soil
+# remove outlier
+drop <- c()
+m_filter <- m_raw[,!colnames(m_raw) %in% drop]
+m_meta_filter <- m_meta[!rownames(m_meta) %in% drop,]
+
+# # make a transposed version of the O Soil sequencing data
+# d16s_m_t <- as.data.frame(t(m_filter))
+# 
+# # calculate Aitchison distance for O Soil samples
+# aitch_m <- aDist(d16s_m_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_m <- as.matrix(aitch_m)
+# 
+# # test for sequencing batch effect
+# adonis2(aitch_m~as.factor(m_meta_filter$sequencing_batch))
+# adonis2(aitch_m~as.numeric(m_meta_filter$seq_count_dada2))
+# m_meta$tree_species[is.na(m_meta_filter$tree_species)] <- "Unknown"
+# 
+# all.MDS_m<-metaMDS(aitch_m,k=2,zerodist="add")
+# m.coordinates<-data.frame(scores(all.MDS_m))
+# m.coordinates <- cbind(m.coordinates, m_meta_filter)
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(m.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Soil Batch Effect")
+
+# # drop samples < 5000 reads
+# m_meta_5000 <- m_meta_filter[m_meta_filter$seq_count_dada2 > 5000,]
+# m_5000 <- m_filter[,colnames(m_filter) %in% rownames(m_meta_5000)]
+# # make a transposed verison of the m sequencing data
+# d16s_m_t <- as.data.frame(t(m_5000))
+# 
+# # calculate Aitchison distance for m samples
+# aitch_m <- aDist(d16s_m_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_m <- as.matrix(aitch_m)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_m~as.factor(m_meta_5000$sequencing_batch))
+# adonis2(aitch_m~as.numeric(m_meta_5000$seq_count_dada2))
+# 
+# all.MDS_m<-metaMDS(aitch_m,k=2,zerodist="add")
+# m.coordinates<-data.frame(scores(all.MDS_m))
+# m.coordinates <- cbind(m.coordinates, m_meta_5000)
+# 
+# # plot samples by different variables
+# ggplot(m.coordinates,
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(m.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+
+# drop samples < 10000 reads
+m_meta_10000 <- m_meta_filter[m_meta_filter$seq_count_dada2 > 8000,]
+m_10000 <- m_filter[,colnames(m_filter) %in% rownames(m_meta_10000)]
+
+# # make a transposed verison of the m sequencing data
+# d16s_m_t <- as.data.frame(t(m_10000))
+# 
+# # calculate Aitchison distance for m samples
+# aitch_m <- aDist(d16s_m_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_m <- as.matrix(aitch_m)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_m~as.factor(m_meta_10000$sequencing_batch))
+# adonis2(aitch_m~as.numeric(m_meta_10000$seq_count_dada2))
+# 
+# all.MDS_m<-metaMDS(aitch_m,k=2,zerodist="add")
+# m.coordinates<-data.frame(scores(all.MDS_m))
+# m.coordinates <- cbind(m.coordinates, m_meta_10000)
+# 
+# # plot samples by different variables
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(m.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+# 
+# ggplot(m.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("M Batch Effect")
+
+# write new data to file
+# #write.csv(m_10000, 
+#           "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Filter_Samples/16S/m_d16s_asv_filtersamples.csv")
+
+# subset the filtered samples out of the phyloseq
+ps_m <- subset_samples(ps_m, sample_names(ps_m) %in% colnames(m_10000))
+```
+
+```{r O Soil sequencing depth}
+### O Soil
+# make new variable for filtration step
+drop <- c("SW08_QR_O_edge_O1_16S_S128", "SW08_QR_M_int_O1_16S_S135",
+          "HW07_QR_Y_edge_O1_16S_S192", "SB_QR_O_pit_O2_16S_S39")
+o_filter <- o_raw[,!colnames(o_raw) %in% drop]
+o_meta_filter <- o_meta[!rownames(o_meta) %in% drop,]
+
+# # make a transposed verison of the O Soil sequencing data
+# d16s_o_t <- as.data.frame(t(o_filter))
+# 
+# # calculate Aitchison distance for O Soil samples
+# aitch_o <- aDist(d16s_o_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_o <- as.matrix(aitch_o)
+# 
+# # test for sequencing batch effect
+# adonis2(aitch_o~as.factor(o_meta_filter$sequencing_batch))
+# adonis2(aitch_o~as.numeric(o_meta_filter$seq_count_dada2))
+# #
+# all.MDS_o<-metaMDS(aitch_o,k=2,zerodist="add")
+# o.coordinates<-data.frame(scores(all.MDS_o))
+# o.coordinates <- cbind(o.coordinates, o_meta_filter)
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(o.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1,
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Soil Batch Effect")
+
+# # drop samples < 5000 reads
+# o_meta_5000 <- o_meta_filter[o_meta_filter$seq_count_dada2 > 5000,]
+# o_5000 <- o_filter[,colnames(o_filter) %in% rownames(o_meta_5000)]
+# 
+# # make a transposed verison of the o sequencing data
+# d16s_o_t <- as.data.frame(t(o_5000))
+# 
+# # calculate Aitchison distance for o samples
+# aitch_o <- aDist(d16s_o_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_o <- as.matrix(aitch_o)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_o~as.factor(o_meta_5000$sequencing_batch))
+# adonis2(aitch_o~as.numeric(o_meta_5000$seq_count_dada2))
+# 
+# all.MDS_o<-metaMDS(aitch_o,k=2,zerodist="add")
+# o.coordinates<-data.frame(scores(all.MDS_o))
+# o.coordinates <- cbind(o.coordinates, o_meta_5000)
+# 
+# # plot samples by different variables
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(o.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+
+# drop samples < 8000 reads
+o_meta_8000 <- o_meta_filter[o_meta_filter$seq_count_dada2 > 8000,]
+o_8000 <- o_filter[,colnames(o_filter) %in% rownames(o_meta_8000)]
+
+# # make a transposed verison of the o sequencing data
+# d16s_o_t <- as.data.frame(t(o_8000))
+# 
+# # calculate Aitchison distance for o samples
+# aitch_o <- aDist(d16s_o_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+# aitch_o <- as.matrix(aitch_o)
+# 
+# # test for sequencing batch and depth effect
+# adonis2(aitch_o~as.factor(o_meta_8000$sequencing_batch))
+# adonis2(aitch_o~as.numeric(o_meta_8000$seq_count_dada2))
+# 
+# all.MDS_o<-metaMDS(aitch_o,k=2,zerodist="add")
+# o.coordinates<-data.frame(scores(all.MDS_o))
+# o.coordinates <- cbind(o.coordinates, o_meta_8000)
+# 
+# # plot samples by different variables
+# ggplot(o.coordinates,
+#        aes(x = NMDS1, 
+#            y = NMDS2)) + 
+#   geom_text(label = rownames(o.coordinates), 
+#             size = 2) + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(sequencing_batch))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(seq_bin))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_age))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_pit_type))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(tree_species))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+# 
+# ggplot(o.coordinates, 
+#        aes(x = NMDS1, 
+#            y = NMDS2, 
+#            col = as.factor(site_name))) + 
+#   geom_point() + 
+#   stat_ellipse() + 
+#   theme_bw() + 
+#   ggtitle("O Batch Effect")
+
+# write new data to file
+#write.csv(o_8000, 
+          # "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Filter_Samples/16S/o_16s_asv_filtersamples.csv")
+
+# subset the filtered samples out of the phyloseq
+ps_o <- subset_samples(ps_o, sample_names(ps_o) %in% colnames(o_8000))
+```
+
+```{r separate by batch}
+# make phyloseqs merging samples with negative controls
+ps_leaf_w_nc <- merge_phyloseq(ps_leaf, ps_leaf_nc)
+ps_root_w_nc <- merge_phyloseq(ps_root, ps_root_nc)
+ps_m_w_nc <- merge_phyloseq(ps_m, ps_m_nc)
+ps_o_w_nc <- merge_phyloseq(ps_o, ps_o_nc)
+
+# leaves
+ps_leaf_nr1 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "NR1")
+ps_leaf_nr2 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "NR2")
+ps_leaf_r1 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "Run1")
+ps_leaf_r2 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "Run2")
+ps_leaf_r3 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "Run3")
+ps_leaf_r4 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "Run4")
+ps_leaf_r5 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "Run5")
+ps_leaf_r6 <- subset_samples(ps_leaf_w_nc, sequencing_batch == "Run6")
+
+# roots
+ps_root_nr1 <- subset_samples(ps_root_w_nc, sequencing_batch == "NR1")
+ps_root_nr2 <- subset_samples(ps_root_w_nc, sequencing_batch == "NR2")
+ps_root_r1 <- subset_samples(ps_root_w_nc, sequencing_batch == "Run1")
+ps_root_r2 <- subset_samples(ps_root_w_nc, sequencing_batch == "Run2")
+ps_root_r3 <- subset_samples(ps_root_w_nc, sequencing_batch == "Run3")
+ps_root_r4 <- subset_samples(ps_root_w_nc, sequencing_batch == "Run4")
+ps_root_r5 <- subset_samples(ps_root_w_nc, sequencing_batch == "Run5")
+ps_root_r6 <- subset_samples(ps_root_w_nc, sequencing_batch == "Run6")
+
+# m soil
+ps_m_nr1 <- subset_samples(ps_m_w_nc, sequencing_batch == "NR1")
+ps_m_nr2 <- subset_samples(ps_m_w_nc, sequencing_batch == "NR2")
+ps_m_r1 <- subset_samples(ps_m_w_nc, sequencing_batch == "Run1")
+ps_m_r2 <- subset_samples(ps_m_w_nc, sequencing_batch == "Run2")
+ps_m_r3 <- subset_samples(ps_m_w_nc, sequencing_batch == "Run3")
+ps_m_r4 <- subset_samples(ps_m_w_nc, sequencing_batch == "Run4")
+ps_m_r5 <- subset_samples(ps_m_w_nc, sequencing_batch == "Run5")
+ps_m_r6 <- subset_samples(ps_m_w_nc, sequencing_batch == "Run6")
+
+# o soil
+ps_o_nr1 <- subset_samples(ps_o_w_nc, sequencing_batch == "NR1")
+ps_o_nr2 <- subset_samples(ps_o_w_nc, sequencing_batch == "NR2")
+ps_o_r1 <- subset_samples(ps_o_w_nc, sequencing_batch == "Run1")
+ps_o_r4 <- subset_samples(ps_o_w_nc, sequencing_batch == "Run4")
+ps_o_rerun <- subset_samples(ps_o_w_nc, sequencing_batch == "ReRun")
+```
+
+```{r visualize leaf decontamination process}
+# make metadata
+leaf_meta_nr1 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_nr1)),]
+# order for rank
+leaf_meta_nr1 <- leaf_meta_nr1[order(leaf_meta_nr1$seq_count_dada2),]
+leaf_meta_nr1$index <- seq(nrow(leaf_meta_nr1))
+# plot
+ggplot(data=leaf_meta_nr1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Nahuel Run 1")
+
+# make metadata
+leaf_meta_nr2 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_nr2)),]
+# order for rank
+leaf_meta_nr2 <- leaf_meta_nr2[order(leaf_meta_nr2$seq_count_dada2),]
+leaf_meta_nr2$index <- seq(nrow(leaf_meta_nr2))
+# plot
+ggplot(data=leaf_meta_nr2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Nahuel Run 2")
+
+# make metadata
+leaf_meta_r1 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_r1)),]
+# order for rank
+leaf_meta_r1 <- leaf_meta_r1[order(leaf_meta_r1$seq_count_dada2),]
+leaf_meta_r1$index <- seq(nrow(leaf_meta_r1))
+# plot
+ggplot(data=leaf_meta_r1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Run 1")
+
+# make metadata
+leaf_meta_r2 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_r2)),]
+# order for rank
+leaf_meta_r2 <- leaf_meta_r2[order(leaf_meta_r2$seq_count_dada2),]
+leaf_meta_r2$index <- seq(nrow(leaf_meta_r2))
+# plot
+ggplot(data=leaf_meta_r2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Run 2")
+
+# make metadata
+leaf_meta_r3 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_r3)),]
+# order for rank
+leaf_meta_r3 <- leaf_meta_r3[order(leaf_meta_r3$seq_count_dada2),]
+leaf_meta_r3$index <- seq(nrow(leaf_meta_r3))
+# plot
+ggplot(data=leaf_meta_r3, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Run 3")
+
+# make metadata
+leaf_meta_r4 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_r4)),]
+# order for rank
+leaf_meta_r4 <- leaf_meta_r4[order(leaf_meta_r4$seq_count_dada2),]
+leaf_meta_r4$index <- seq(nrow(leaf_meta_r4))
+# plot
+ggplot(data=leaf_meta_r4, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Run 4")
+
+# make metadata
+leaf_meta_r5 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_r5)),]
+# order for rank
+leaf_meta_r5 <- leaf_meta_r5[order(leaf_meta_r5$seq_count_dada2),]
+leaf_meta_r5$index <- seq(nrow(leaf_meta_r5))
+# plot
+ggplot(data=leaf_meta_r5, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Run 5")
+
+# make metadata
+leaf_meta_r6 <- meta[which(rownames(meta) %in% sample_names(ps_leaf_r6)),]
+# order for rank
+leaf_meta_r6 <- leaf_meta_r6[order(leaf_meta_r6$seq_count_dada2),]
+leaf_meta_r6$index <- seq(nrow(leaf_meta_r6))
+# plot
+ggplot(data=leaf_meta_r6, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Leaf Run 6")
+```
+
+```{r visualize root decontamination process}
+# make metadata
+root_meta_nr1 <- meta[which(rownames(meta) %in% sample_names(ps_root_nr1)),]
+# order for rank
+root_meta_nr1 <- root_meta_nr1[order(root_meta_nr1$seq_count_dada2),]
+root_meta_nr1$index <- seq(nrow(root_meta_nr1))
+# plot
+ggplot(data=root_meta_nr1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Nahuel Run 1")
+
+# make metadata
+root_meta_nr2 <- meta[which(rownames(meta) %in% sample_names(ps_root_nr2)),]
+# order for rank
+root_meta_nr2 <- root_meta_nr2[order(root_meta_nr2$seq_count_dada2),]
+root_meta_nr2$index <- seq(nrow(root_meta_nr2))
+# plot
+ggplot(data=root_meta_nr2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Nahuel Run 2")
+
+# make metadata
+root_meta_r1 <- meta[which(rownames(meta) %in% sample_names(ps_root_r1)),]
+# order for rank
+root_meta_r1 <- root_meta_r1[order(root_meta_r1$seq_count_dada2),]
+root_meta_r1$index <- seq(nrow(root_meta_r1))
+# plot
+ggplot(data=root_meta_r1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Run 1")
+
+# make metadata
+root_meta_r2 <- meta[which(rownames(meta) %in% sample_names(ps_root_r2)),]
+# order for rank
+root_meta_r2 <- root_meta_r2[order(root_meta_r2$seq_count_dada2),]
+root_meta_r2$index <- seq(nrow(root_meta_r2))
+# plot
+ggplot(data=root_meta_r2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Run 2")
+
+# make metadata
+root_meta_r3 <- meta[which(rownames(meta) %in% sample_names(ps_root_r3)),]
+# order for rank
+root_meta_r3 <- root_meta_r3[order(root_meta_r3$seq_count_dada2),]
+root_meta_r3$index <- seq(nrow(root_meta_r3))
+# plot
+ggplot(data=root_meta_r3, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Run 3")
+
+# make metadata
+root_meta_r4 <- meta[which(rownames(meta) %in% sample_names(ps_root_r4)),]
+# order for rank
+root_meta_r4 <- root_meta_r4[order(root_meta_r4$seq_count_dada2),]
+root_meta_r4$index <- seq(nrow(root_meta_r4))
+# plot
+ggplot(data=root_meta_r4, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Run 4")
+
+# make metadata
+root_meta_r5 <- meta[which(rownames(meta) %in% sample_names(ps_root_r5)),]
+# order for rank
+root_meta_r5 <- root_meta_r5[order(root_meta_r5$seq_count_dada2),]
+root_meta_r5$index <- seq(nrow(root_meta_r5))
+# plot
+ggplot(data=root_meta_r5, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Run 5")
+
+# make metadata
+root_meta_r6 <- meta[which(rownames(meta) %in% sample_names(ps_root_r6)),]
+# order for rank
+root_meta_r6 <- root_meta_r6[order(root_meta_r6$seq_count_dada2),]
+root_meta_r6$index <- seq(nrow(root_meta_r6))
+# plot
+ggplot(data=root_meta_r6, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("Root Run 6")
+```
+
+```{r visualize m decontamination process}
+# make metadata
+m_meta_nr1 <- meta[which(rownames(meta) %in% sample_names(ps_m_nr1)),]
+# order for rank
+m_meta_nr1 <- m_meta_nr1[order(m_meta_nr1$seq_count_dada2),]
+m_meta_nr1$index <- seq(nrow(m_meta_nr1))
+# plot
+ggplot(data=m_meta_nr1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Nahuel Run 1")
+
+# make metadata
+m_meta_nr2 <- meta[which(rownames(meta) %in% sample_names(ps_m_nr2)),]
+# order for rank
+m_meta_nr2 <- m_meta_nr2[order(m_meta_nr2$seq_count_dada2),]
+m_meta_nr2$index <- seq(nrow(m_meta_nr2))
+# plot
+ggplot(data=m_meta_nr2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Nahuel Run 2")
+
+# make metadata
+m_meta_r1 <- meta[which(rownames(meta) %in% sample_names(ps_m_r1)),]
+# order for rank
+m_meta_r1 <- m_meta_r1[order(m_meta_r1$seq_count_dada2),]
+m_meta_r1$index <- seq(nrow(m_meta_r1))
+# plot
+ggplot(data=m_meta_r1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Run 1")
+
+# make metadata
+m_meta_r2 <- meta[which(rownames(meta) %in% sample_names(ps_m_r2)),]
+# order for rank
+m_meta_r2 <- m_meta_r2[order(m_meta_r2$seq_count_dada2),]
+m_meta_r2$index <- seq(nrow(m_meta_r2))
+# plot
+ggplot(data=m_meta_r2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Run 2")
+
+# make metadata
+m_meta_r3 <- meta[which(rownames(meta) %in% sample_names(ps_m_r3)),]
+# order for rank
+m_meta_r3 <- m_meta_r3[order(m_meta_r3$seq_count_dada2),]
+m_meta_r3$index <- seq(nrow(m_meta_r3))
+# plot
+ggplot(data=m_meta_r3, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Run 3")
+
+# make metadata
+m_meta_r4 <- meta[which(rownames(meta) %in% sample_names(ps_m_r4)),]
+# order for rank
+m_meta_r4 <- m_meta_r4[order(m_meta_r4$seq_count_dada2),]
+m_meta_r4$index <- seq(nrow(m_meta_r4))
+# plot
+ggplot(data=m_meta_r4, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Run 4")
+
+# make metadata
+m_meta_r5 <- meta[which(rownames(meta) %in% sample_names(ps_m_r5)),]
+# order for rank
+m_meta_r5 <- m_meta_r5[order(m_meta_r5$seq_count_dada2),]
+m_meta_r5$index <- seq(nrow(m_meta_r5))
+# plot
+ggplot(data=m_meta_r5, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Run 5")
+
+# make metadata
+m_meta_r6 <- meta[which(rownames(meta) %in% sample_names(ps_m_r6)),]
+# order for rank
+m_meta_r6 <- m_meta_r6[order(m_meta_r6$seq_count_dada2),]
+m_meta_r6$index <- seq(nrow(m_meta_r6))
+# plot
+ggplot(data=m_meta_r6, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("M Soil Run 6")
+```
+
+```{r visualize o decontamination process}
+# make metadata
+o_meta_nr1 <- meta[which(rownames(meta) %in% sample_names(ps_o_nr1)),]
+# order for rank
+o_meta_nr1 <- o_meta_nr1[order(o_meta_nr1$seq_count_dada2),]
+o_meta_nr1$index <- seq(nrow(o_meta_nr1))
+# plot
+ggplot(data=o_meta_nr1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("O Soil Nahuel Run 1")
+
+# make metadata
+o_meta_nr2 <- meta[which(rownames(meta) %in% sample_names(ps_o_nr2)),]
+# order for rank
+o_meta_nr2 <- o_meta_nr2[order(o_meta_nr2$seq_count_dada2),]
+o_meta_nr2$index <- seq(nrow(o_meta_nr2))
+# plot
+ggplot(data=o_meta_nr2, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("O Soil Nahuel Run 2")
+
+# make metadata
+o_meta_r1 <- meta[which(rownames(meta) %in% sample_names(ps_o_r1)),]
+# order for rank
+o_meta_r1 <- o_meta_r1[order(o_meta_r1$seq_count_dada2),]
+o_meta_r1$index <- seq(nrow(o_meta_r1))
+# plot
+ggplot(data=o_meta_r1, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("O Soil Run 1")
+
+# make metadata
+o_meta_r4 <- meta[which(rownames(meta) %in% sample_names(ps_o_r4)),]
+# order for rank
+o_meta_r4 <- o_meta_r4[order(o_meta_r4$seq_count_dada2),]
+o_meta_r4$index <- seq(nrow(o_meta_r4))
+# plot
+ggplot(data=o_meta_r4, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("O Soil Run 4")
+
+# make metadata
+o_meta_rerun <- meta[which(rownames(meta) %in% sample_names(ps_o_rerun)),]
+# order for rank
+o_meta_rerun <- o_meta_rerun[order(o_meta_rerun$seq_count_dada2),]
+o_meta_rerun$index <- seq(nrow(o_meta_rerun))
+# plot
+ggplot(data=o_meta_rerun, aes(x=index, y=seq_count_dada2, color=is_control)) + geom_point() + theme_bw() + ggtitle("O Soil ReRun")
+
+
+```
+
+```{r decontaminate leaves}
+## Leaves
+# run decontam for each batch
+contamdf.leaf_nr1 <- isContaminant(ps_leaf_nr1, neg = "is_control", method = "prevalence") 
+contamdf.leaf_nr2 <- isContaminant(ps_leaf_nr2, neg = "is_control", method = "prevalence")
+contamdf.leaf_r1 <- isContaminant(ps_leaf_r1, neg = "is_control", method = "prevalence")
+contamdf.leaf_r2 <- isContaminant(ps_leaf_r2, neg = "is_control", method = "prevalence")
+contamdf.leaf_r3 <- isContaminant(ps_leaf_r3, neg = "is_control", method = "prevalence")
+contamdf.leaf_r4 <- isContaminant(ps_leaf_r4, neg = "is_control", method = "prevalence")
+contamdf.leaf_r5 <- isContaminant(ps_leaf_r5, neg = "is_control", method = "prevalence")
+contamdf.leaf_r6 <- isContaminant(ps_leaf_r6, neg = "is_control", method = "prevalence")
+
+# visualize contaminants
+# nr1
+ps_leaf_nr1_pa <- transform_sample_counts(ps_leaf_nr1, function(abund) 1*(abund>0))
+ps_leaf_nr1_neg <- prune_samples(sample_data(ps_leaf_nr1)$is_control == TRUE, ps_leaf_nr1)
+ps_leaf_nr1_pos <- prune_samples(sample_data(ps_leaf_nr1)$is_control == FALSE, ps_leaf_nr1)
+df_ps_leaf_nr1 <- data.frame(ps_leaf_nr1_pos=taxa_sums(ps_leaf_nr1_pos), ps_leaf_nr1_neg=taxa_sums(ps_leaf_nr1_neg),
+                      contaminant=contamdf.leaf_nr1$contaminant)
+ggplot(data=df_ps_leaf_nr1, aes(x=ps_leaf_nr1_neg, y=ps_leaf_nr1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Nahuel Run 1") + theme_bw()
+# nr2
+ps_leaf_nr2_pa <- transform_sample_counts(ps_leaf_nr2, function(abund) 1*(abund>0))
+ps_leaf_nr2_neg <- prune_samples(sample_data(ps_leaf_nr2)$is_control == TRUE, ps_leaf_nr2)
+ps_leaf_nr2_pos <- prune_samples(sample_data(ps_leaf_nr2)$is_control == FALSE, ps_leaf_nr2)
+df_ps_leaf_nr2 <- data.frame(ps_leaf_nr2_pos=taxa_sums(ps_leaf_nr2_pos), ps_leaf_nr2_neg=taxa_sums(ps_leaf_nr2_neg),
+                      contaminant=contamdf.leaf_nr2$contaminant)
+ggplot(data=df_ps_leaf_nr2, aes(x=ps_leaf_nr2_neg, y=ps_leaf_nr2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Nahuel Run 2") + theme_bw()
+# r1
+ps_leaf_r1_pa <- transform_sample_counts(ps_leaf_r1, function(abund) 1*(abund>0))
+ps_leaf_r1_neg <- prune_samples(sample_data(ps_leaf_r1)$is_control == TRUE, ps_leaf_r1)
+ps_leaf_r1_pos <- prune_samples(sample_data(ps_leaf_r1)$is_control == FALSE, ps_leaf_r1)
+df_ps_leaf_r1 <- data.frame(ps_leaf_r1_pos=taxa_sums(ps_leaf_r1_pos), ps_leaf_r1_neg=taxa_sums(ps_leaf_r1_neg),
+                      contaminant=contamdf.leaf_r1$contaminant)
+ggplot(data=df_ps_leaf_r1, aes(x=ps_leaf_r1_neg, y=ps_leaf_r1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Run 1") + theme_bw()
+# r2
+ps_leaf_r2_pa <- transform_sample_counts(ps_leaf_r2, function(abund) 1*(abund>0))
+ps_leaf_r2_neg <- prune_samples(sample_data(ps_leaf_r2)$is_control == TRUE, ps_leaf_r2)
+ps_leaf_r2_pos <- prune_samples(sample_data(ps_leaf_r2)$is_control == FALSE, ps_leaf_r2)
+df_ps_leaf_r2 <- data.frame(ps_leaf_r2_pos=taxa_sums(ps_leaf_r2_pos), ps_leaf_r2_neg=taxa_sums(ps_leaf_r2_neg),
+                      contaminant=contamdf.leaf_r2$contaminant)
+ggplot(data=df_ps_leaf_r2, aes(x=ps_leaf_r2_neg, y=ps_leaf_r2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Run 2") + theme_bw()
+# r3
+ps_leaf_r3_pa <- transform_sample_counts(ps_leaf_r3, function(abund) 1*(abund>0))
+ps_leaf_r3_neg <- prune_samples(sample_data(ps_leaf_r3)$is_control == TRUE, ps_leaf_r3)
+ps_leaf_r3_pos <- prune_samples(sample_data(ps_leaf_r3)$is_control == FALSE, ps_leaf_r3)
+df_ps_leaf_r3 <- data.frame(ps_leaf_r3_pos=taxa_sums(ps_leaf_r3_pos), ps_leaf_r3_neg=taxa_sums(ps_leaf_r3_neg),
+                      contaminant=contamdf.leaf_r3$contaminant)
+ggplot(data=df_ps_leaf_r3, aes(x=ps_leaf_r3_neg, y=ps_leaf_r3_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Run 3") + theme_bw()
+# r4
+ps_leaf_r4_pa <- transform_sample_counts(ps_leaf_r4, function(abund) 1*(abund>0))
+ps_leaf_r4_neg <- prune_samples(sample_data(ps_leaf_r4)$is_control == TRUE, ps_leaf_r4)
+ps_leaf_r4_pos <- prune_samples(sample_data(ps_leaf_r4)$is_control == FALSE, ps_leaf_r4)
+df_ps_leaf_r4 <- data.frame(ps_leaf_r4_pos=taxa_sums(ps_leaf_r4_pos), ps_leaf_r4_neg=taxa_sums(ps_leaf_r4_neg),
+                      contaminant=contamdf.leaf_r4$contaminant)
+ggplot(data=df_ps_leaf_r4, aes(x=ps_leaf_r4_neg, y=ps_leaf_r4_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Run 4") + theme_bw()
+# r5
+ps_leaf_r5_pa <- transform_sample_counts(ps_leaf_r5, function(abund) 1*(abund>0))
+ps_leaf_r5_neg <- prune_samples(sample_data(ps_leaf_r5)$is_control == TRUE, ps_leaf_r5)
+ps_leaf_r5_pos <- prune_samples(sample_data(ps_leaf_r5)$is_control == FALSE, ps_leaf_r5)
+df_ps_leaf_r5 <- data.frame(ps_leaf_r5_pos=taxa_sums(ps_leaf_r5_pos), ps_leaf_r5_neg=taxa_sums(ps_leaf_r5_neg),
+                      contaminant=contamdf.leaf_r5$contaminant)
+ggplot(data=df_ps_leaf_r5, aes(x=ps_leaf_r5_neg, y=ps_leaf_r5_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Run 5") + theme_bw()
+# r6
+ps_leaf_r6_pa <- transform_sample_counts(ps_leaf_r6, function(abund) 1*(abund>0))
+ps_leaf_r6_neg <- prune_samples(sample_data(ps_leaf_r6)$is_control == TRUE, ps_leaf_r6)
+ps_leaf_r6_pos <- prune_samples(sample_data(ps_leaf_r6)$is_control == FALSE, ps_leaf_r6)
+df_ps_leaf_r6 <- data.frame(ps_leaf_r6_pos=taxa_sums(ps_leaf_r6_pos), ps_leaf_r6_neg=taxa_sums(ps_leaf_r6_neg),
+                      contaminant=contamdf.leaf_r6$contaminant)
+ggplot(data=df_ps_leaf_r6, aes(x=ps_leaf_r6_neg, y=ps_leaf_r6_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Leaf Run 6") + theme_bw()
+
+# identify contaminants
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_nr1)[which(contamdf.leaf_nr1$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_nr2)[which(contamdf.leaf_nr2$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_r1)[which(contamdf.leaf_r1$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_r2)[which(contamdf.leaf_r2$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_r3)[which(contamdf.leaf_r3$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_r4)[which(contamdf.leaf_r4$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_r6)[which(contamdf.leaf_r6$contaminant == TRUE)]),]
+leaf_raw_tax[which(rownames(leaf_raw_tax) %in% rownames(contamdf.leaf_r5)[which(contamdf.leaf_r5$contaminant == TRUE)]),]
+
+# remove contaminants
+leaf_nr1 <- prune_taxa(!contamdf.leaf_nr1$contaminant, ps_leaf_nr1)
+leaf_nr2 <- prune_taxa(!contamdf.leaf_nr2$contaminant, ps_leaf_nr2)
+leaf_r1 <- prune_taxa(!contamdf.leaf_r1$contaminant, ps_leaf_r1)
+leaf_r2 <- prune_taxa(!contamdf.leaf_r2$contaminant, ps_leaf_r2)
+leaf_r3 <- prune_taxa(!contamdf.leaf_r3$contaminant, ps_leaf_r3)
+leaf_r4 <- prune_taxa(!contamdf.leaf_r4$contaminant, ps_leaf_r4)
+leaf_r5 <- prune_taxa(!contamdf.leaf_r5$contaminant, ps_leaf_r5)
+leaf_r6 <- prune_taxa(!contamdf.leaf_r6$contaminant, ps_leaf_r6)
+
+# merge back into one dataset
+ps_leaf_decontam <- merge_phyloseq(leaf_nr1, leaf_nr2)
+ps_leaf_decontam <- merge_phyloseq(ps_leaf_decontam, leaf_r1)
+ps_leaf_decontam <- merge_phyloseq(ps_leaf_decontam, leaf_r2)
+ps_leaf_decontam <- merge_phyloseq(ps_leaf_decontam, leaf_r3)
+ps_leaf_decontam <- merge_phyloseq(ps_leaf_decontam, leaf_r4)
+ps_leaf_decontam <- merge_phyloseq(ps_leaf_decontam, leaf_r5)
+ps_leaf_decontam <- merge_phyloseq(ps_leaf_decontam, leaf_r6)
+
+# remove negative controls
+ps_leaf_decontam <- subset_samples(ps_leaf_decontam, sample_type == "Leaf")
+
+# remove chloroplasts and mitochondria
+# remove anything that is not a Bacteria
+ps_leaf_decontam <- subset_taxa(ps_leaf_decontam, 
+                                Kingdom != "Unassigned")
+ps_leaf_decontam <- subset_taxa(ps_leaf_decontam, 
+                                Kingdom != "d__Eukaryota")
+ps_leaf_decontam <- subset_taxa(ps_leaf_decontam, 
+                                Family != " f__Mitochondria")
+ps_leaf_decontam <- subset_taxa(ps_leaf_decontam, 
+                                Order != " o__Chloroplast")
+
+# write asv table to csv
+leaf_decontam <- as.data.frame(as.matrix(ps_leaf_decontam@otu_table))
+write.csv(leaf_decontam,
+          "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/leaf_16s_asv_decontam.csv")
+```
+
+```{r decontaminate roots}
+## Roots
+# run decontam for each batch
+contamdf.root_nr1 <- isContaminant(ps_root_nr1, neg = "is_control", method = "prevalence")
+contamdf.root_nr2 <- isContaminant(ps_root_nr2, neg = "is_control", method = "prevalence")
+contamdf.root_r1 <- isContaminant(ps_root_r1, neg = "is_control", method = "prevalence")
+contamdf.root_r2 <- isContaminant(ps_root_r2, neg = "is_control", method = "prevalence")
+contamdf.root_r3 <- isContaminant(ps_root_r3, neg = "is_control", method = "prevalence")
+contamdf.root_r4 <- isContaminant(ps_root_r4, neg = "is_control", method = "prevalence")
+contamdf.root_r5 <- isContaminant(ps_root_r5, neg = "is_control", method = "prevalence")
+contamdf.root_r6 <- isContaminant(ps_root_r6, neg = "is_control", method = "prevalence")
+
+# visualize contaminants
+# nr1
+ps_root_nr1_pa <- transform_sample_counts(ps_root_nr1, function(abund) 1*(abund>0))
+ps_root_nr1_neg <- prune_samples(sample_data(ps_root_nr1)$is_control == TRUE, ps_root_nr1)
+ps_root_nr1_pos <- prune_samples(sample_data(ps_root_nr1)$is_control == FALSE, ps_root_nr1)
+df_ps_root_nr1 <- data.frame(ps_root_nr1_pos=taxa_sums(ps_root_nr1_pos), ps_root_nr1_neg=taxa_sums(ps_root_nr1_neg),
+                      contaminant=contamdf.root_nr1$contaminant)
+ggplot(data=df_ps_root_nr1, aes(x=ps_root_nr1_neg, y=ps_root_nr1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Nahuel Run 1") + theme_bw()
+# nr2
+ps_root_nr2_pa <- transform_sample_counts(ps_root_nr2, function(abund) 1*(abund>0))
+ps_root_nr2_neg <- prune_samples(sample_data(ps_root_nr2)$is_control == TRUE, ps_root_nr2)
+ps_root_nr2_pos <- prune_samples(sample_data(ps_root_nr2)$is_control == FALSE, ps_root_nr2)
+df_ps_root_nr2 <- data.frame(ps_root_nr2_pos=taxa_sums(ps_root_nr2_pos), ps_root_nr2_neg=taxa_sums(ps_root_nr2_neg),
+                      contaminant=contamdf.root_nr2$contaminant)
+ggplot(data=df_ps_root_nr2, aes(x=ps_root_nr2_neg, y=ps_root_nr2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Nahuel Run 2") + theme_bw()
+# r1
+ps_root_r1_pa <- transform_sample_counts(ps_root_r1, function(abund) 1*(abund>0))
+ps_root_r1_neg <- prune_samples(sample_data(ps_root_r1)$is_control == TRUE, ps_root_r1)
+ps_root_r1_pos <- prune_samples(sample_data(ps_root_r1)$is_control == FALSE, ps_root_r1)
+df_ps_root_r1 <- data.frame(ps_root_r1_pos=taxa_sums(ps_root_r1_pos), ps_root_r1_neg=taxa_sums(ps_root_r1_neg),
+                      contaminant=contamdf.root_r1$contaminant)
+ggplot(data=df_ps_root_r1, aes(x=ps_root_r1_neg, y=ps_root_r1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Run 1") + theme_bw()
+# r2
+ps_root_r2_pa <- transform_sample_counts(ps_root_r2, function(abund) 1*(abund>0))
+ps_root_r2_neg <- prune_samples(sample_data(ps_root_r2)$is_control == TRUE, ps_root_r2)
+ps_root_r2_pos <- prune_samples(sample_data(ps_root_r2)$is_control == FALSE, ps_root_r2)
+df_ps_root_r2 <- data.frame(ps_root_r2_pos=taxa_sums(ps_root_r2_pos), ps_root_r2_neg=taxa_sums(ps_root_r2_neg),
+                      contaminant=contamdf.root_r2$contaminant)
+ggplot(data=df_ps_root_r2, aes(x=ps_root_r2_neg, y=ps_root_r2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Run 2") + theme_bw()
+# r3
+ps_root_r3_pa <- transform_sample_counts(ps_root_r3, function(abund) 1*(abund>0))
+ps_root_r3_neg <- prune_samples(sample_data(ps_root_r3)$is_control == TRUE, ps_root_r3)
+ps_root_r3_pos <- prune_samples(sample_data(ps_root_r3)$is_control == FALSE, ps_root_r3)
+df_ps_root_r3 <- data.frame(ps_root_r3_pos=taxa_sums(ps_root_r3_pos), ps_root_r3_neg=taxa_sums(ps_root_r3_neg),
+                      contaminant=contamdf.root_r3$contaminant)
+ggplot(data=df_ps_root_r3, aes(x=ps_root_r3_neg, y=ps_root_r3_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Run 3") + theme_bw()
+# r4
+ps_root_r4_pa <- transform_sample_counts(ps_root_r4, function(abund) 1*(abund>0))
+ps_root_r4_neg <- prune_samples(sample_data(ps_root_r4)$is_control == TRUE, ps_root_r4)
+ps_root_r4_pos <- prune_samples(sample_data(ps_root_r4)$is_control == FALSE, ps_root_r4)
+df_ps_root_r4 <- data.frame(ps_root_r4_pos=taxa_sums(ps_root_r4_pos), ps_root_r4_neg=taxa_sums(ps_root_r4_neg),
+                      contaminant=contamdf.root_r4$contaminant)
+ggplot(data=df_ps_root_r4, aes(x=ps_root_r4_neg, y=ps_root_r4_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Run 4") + theme_bw()
+# r5
+ps_root_r5_pa <- transform_sample_counts(ps_root_r5, function(abund) 1*(abund>0))
+ps_root_r5_neg <- prune_samples(sample_data(ps_root_r5)$is_control == TRUE, ps_root_r5)
+ps_root_r5_pos <- prune_samples(sample_data(ps_root_r5)$is_control == FALSE, ps_root_r5)
+df_ps_root_r5 <- data.frame(ps_root_r5_pos=taxa_sums(ps_root_r5_pos), ps_root_r5_neg=taxa_sums(ps_root_r5_neg),
+                      contaminant=contamdf.root_r5$contaminant)
+ggplot(data=df_ps_root_r5, aes(x=ps_root_r5_neg, y=ps_root_r5_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Run 5") + theme_bw()
+# r6
+ps_root_r6_pa <- transform_sample_counts(ps_root_r6, function(abund) 1*(abund>0))
+ps_root_r6_neg <- prune_samples(sample_data(ps_root_r6)$is_control == TRUE, ps_root_r6)
+ps_root_r6_pos <- prune_samples(sample_data(ps_root_r6)$is_control == FALSE, ps_root_r6)
+df_ps_root_r6 <- data.frame(ps_root_r6_pos=taxa_sums(ps_root_r6_pos), ps_root_r6_neg=taxa_sums(ps_root_r6_neg),
+                      contaminant=contamdf.root_r6$contaminant)
+ggplot(data=df_ps_root_r6, aes(x=ps_root_r6_neg, y=ps_root_r6_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("Root Run 6") + theme_bw()
+
+# identify contaminants
+root_raw_tax[which(rownames(root_raw_tax) %in% rownames(contamdf.root_r1)[which(contamdf.root_r1$contaminant == TRUE)]),]
+root_raw_tax[which(rownames(root_raw_tax) %in% rownames(contamdf.root_r2)[which(contamdf.root_r2$contaminant == TRUE)]),]
+root_raw_tax[which(rownames(root_raw_tax) %in% rownames(contamdf.root_r3)[which(contamdf.root_r3$contaminant == TRUE)]),]
+root_raw_tax[which(rownames(root_raw_tax) %in% rownames(contamdf.root_r4)[which(contamdf.root_r4$contaminant == TRUE)]),]
+root_raw_tax[which(rownames(root_raw_tax) %in% rownames(contamdf.root_r5)[which(contamdf.root_r5$contaminant == TRUE)]),]
+
+# remove contaminants
+root_nr1 <- prune_taxa(!contamdf.root_nr1$contaminant, ps_root_nr1)
+root_nr2 <- prune_taxa(!contamdf.root_nr2$contaminant, ps_root_nr2)
+root_r1 <- prune_taxa(!contamdf.root_r1$contaminant, ps_root_r1)
+root_r2 <- prune_taxa(!contamdf.root_r2$contaminant, ps_root_r2)
+root_r3 <- prune_taxa(!contamdf.root_r3$contaminant, ps_root_r3)
+root_r4 <- prune_taxa(!contamdf.root_r4$contaminant, ps_root_r4)
+root_r5 <- prune_taxa(!contamdf.root_r5$contaminant, ps_root_r5)
+root_r6 <- prune_taxa(!contamdf.root_r6$contaminant, ps_root_r6)
+
+# merge back into one dataset
+ps_root_decontam <- merge_phyloseq(root_nr1, root_nr2)
+ps_root_decontam <- merge_phyloseq(ps_root_decontam, root_r1)
+ps_root_decontam <- merge_phyloseq(ps_root_decontam, root_r2)
+ps_root_decontam <- merge_phyloseq(ps_root_decontam, root_r3)
+ps_root_decontam <- merge_phyloseq(ps_root_decontam, root_r4)
+ps_root_decontam <- merge_phyloseq(ps_root_decontam, root_r5)
+ps_root_decontam <- merge_phyloseq(ps_root_decontam, root_r6)
+
+# remove negative controls
+ps_root_decontam <- subset_samples(ps_root_decontam, sample_type == "Root")
+
+# remove mitochondria, chloroplast, and unassigned kingdom reads
+ps_root_decontam <- subset_taxa(ps_root_decontam, 
+                                Kingdom != "Unassigned")
+ps_root_decontam <- subset_taxa(ps_root_decontam, 
+                                Kingdom != "d__Eukaryota")
+ps_root_decontam <- subset_taxa(ps_root_decontam, 
+                                Family != " f__Mitochondria")
+ps_root_decontam <- subset_taxa(ps_root_decontam, 
+                                Order != " o__Chloroplast")
+
+# write asv table to csv
+root_decontam <- as.data.frame(as.matrix(ps_root_decontam@otu_table))
+write.csv(root_decontam,
+          "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/root_16s_asv_decontam.csv")
+```
+
+```{r decontaminate m soils}
+## M Soils
+# run decontam for each batch
+contamdf.m_nr1 <- isContaminant(ps_m_nr1, neg = "is_control", method = "prevalence")
+contamdf.m_nr2 <- isContaminant(ps_m_nr2, neg = "is_control", method = "prevalence")
+contamdf.m_r1 <- isContaminant(ps_m_r1, neg = "is_control", method = "prevalence")
+contamdf.m_r2 <- isContaminant(ps_m_r2, neg = "is_control", method = "prevalence")
+contamdf.m_r3 <- isContaminant(ps_m_r3, neg = "is_control", method = "prevalence")
+contamdf.m_r4 <- isContaminant(ps_m_r4, neg = "is_control", method = "prevalence")
+contamdf.m_r5 <- isContaminant(ps_m_r5, neg = "is_control", method = "prevalence")
+contamdf.m_r6 <- isContaminant(ps_m_r6, neg = "is_control", method = "prevalence")
+
+# visualize contaminants
+# nr1
+ps_m_nr1_pa <- transform_sample_counts(ps_m_nr1, function(abund) 1*(abund>0))
+ps_m_nr1_neg <- prune_samples(sample_data(ps_m_nr1)$is_control == TRUE, ps_m_nr1)
+ps_m_nr1_pos <- prune_samples(sample_data(ps_m_nr1)$is_control == FALSE, ps_m_nr1)
+df_ps_m_nr1 <- data.frame(ps_m_nr1_pos=taxa_sums(ps_m_nr1_pos), ps_m_nr1_neg=taxa_sums(ps_m_nr1_neg),
+                      contaminant=contamdf.m_nr1$contaminant)
+ggplot(data=df_ps_m_nr1, aes(x=ps_m_nr1_neg, y=ps_m_nr1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Nahuel Run 1") + theme_bw()
+# nr2
+ps_m_nr2_pa <- transform_sample_counts(ps_m_nr2, function(abund) 1*(abund>0))
+ps_m_nr2_neg <- prune_samples(sample_data(ps_m_nr2)$is_control == TRUE, ps_m_nr2)
+ps_m_nr2_pos <- prune_samples(sample_data(ps_m_nr2)$is_control == FALSE, ps_m_nr2)
+df_ps_m_nr2 <- data.frame(ps_m_nr2_pos=taxa_sums(ps_m_nr2_pos), ps_m_nr2_neg=taxa_sums(ps_m_nr2_neg),
+                      contaminant=contamdf.m_nr2$contaminant)
+ggplot(data=df_ps_m_nr2, aes(x=ps_m_nr2_neg, y=ps_m_nr2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Nahuel Run 2") + theme_bw()
+# r1
+ps_m_r1_pa <- transform_sample_counts(ps_m_r1, function(abund) 1*(abund>0))
+ps_m_r1_neg <- prune_samples(sample_data(ps_m_r1)$is_control == TRUE, ps_m_r1)
+ps_m_r1_pos <- prune_samples(sample_data(ps_m_r1)$is_control == FALSE, ps_m_r1)
+df_ps_m_r1 <- data.frame(ps_m_r1_pos=taxa_sums(ps_m_r1_pos), ps_m_r1_neg=taxa_sums(ps_m_r1_neg),
+                      contaminant=contamdf.m_r1$contaminant)
+ggplot(data=df_ps_m_r1, aes(x=ps_m_r1_neg, y=ps_m_r1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Run 1") + theme_bw()
+# r2
+ps_m_r2_pa <- transform_sample_counts(ps_m_r2, function(abund) 1*(abund>0))
+ps_m_r2_neg <- prune_samples(sample_data(ps_m_r2)$is_control == TRUE, ps_m_r2)
+ps_m_r2_pos <- prune_samples(sample_data(ps_m_r2)$is_control == FALSE, ps_m_r2)
+df_ps_m_r2 <- data.frame(ps_m_r2_pos=taxa_sums(ps_m_r2_pos), ps_m_r2_neg=taxa_sums(ps_m_r2_neg),
+                      contaminant=contamdf.m_r2$contaminant)
+ggplot(data=df_ps_m_r2, aes(x=ps_m_r2_neg, y=ps_m_r2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Run 2") + theme_bw()
+# r3
+ps_m_r3_pa <- transform_sample_counts(ps_m_r3, function(abund) 1*(abund>0))
+ps_m_r3_neg <- prune_samples(sample_data(ps_m_r3)$is_control == TRUE, ps_m_r3)
+ps_m_r3_pos <- prune_samples(sample_data(ps_m_r3)$is_control == FALSE, ps_m_r3)
+df_ps_m_r3 <- data.frame(ps_m_r3_pos=taxa_sums(ps_m_r3_pos), ps_m_r3_neg=taxa_sums(ps_m_r3_neg),
+                      contaminant=contamdf.m_r3$contaminant)
+ggplot(data=df_ps_m_r3, aes(x=ps_m_r3_neg, y=ps_m_r3_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Run 3") + theme_bw()
+# r4
+ps_m_r4_pa <- transform_sample_counts(ps_m_r4, function(abund) 1*(abund>0))
+ps_m_r4_neg <- prune_samples(sample_data(ps_m_r4)$is_control == TRUE, ps_m_r4)
+ps_m_r4_pos <- prune_samples(sample_data(ps_m_r4)$is_control == FALSE, ps_m_r4)
+df_ps_m_r4 <- data.frame(ps_m_r4_pos=taxa_sums(ps_m_r4_pos), ps_m_r4_neg=taxa_sums(ps_m_r4_neg),
+                      contaminant=contamdf.m_r4$contaminant)
+ggplot(data=df_ps_m_r4, aes(x=ps_m_r4_neg, y=ps_m_r4_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Run 4") + theme_bw()
+# r5
+ps_m_r5_pa <- transform_sample_counts(ps_m_r5, function(abund) 1*(abund>0))
+ps_m_r5_neg <- prune_samples(sample_data(ps_m_r5)$is_control == TRUE, ps_m_r5)
+ps_m_r5_pos <- prune_samples(sample_data(ps_m_r5)$is_control == FALSE, ps_m_r5)
+df_ps_m_r5 <- data.frame(ps_m_r5_pos=taxa_sums(ps_m_r5_pos), ps_m_r5_neg=taxa_sums(ps_m_r5_neg),
+                      contaminant=contamdf.m_r5$contaminant)
+ggplot(data=df_ps_m_r5, aes(x=ps_m_r5_neg, y=ps_m_r5_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Run 5") + theme_bw()
+# r6
+ps_m_r6_pa <- transform_sample_counts(ps_m_r6, function(abund) 1*(abund>0))
+ps_m_r6_neg <- prune_samples(sample_data(ps_m_r6)$is_control == TRUE, ps_m_r6)
+ps_m_r6_pos <- prune_samples(sample_data(ps_m_r6)$is_control == FALSE, ps_m_r6)
+df_ps_m_r6 <- data.frame(ps_m_r6_pos=taxa_sums(ps_m_r6_pos), ps_m_r6_neg=taxa_sums(ps_m_r6_neg),
+                      contaminant=contamdf.m_r6$contaminant)
+ggplot(data=df_ps_m_r6, aes(x=ps_m_r6_neg, y=ps_m_r6_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("M Run 6") + theme_bw()
+
+# identify contaminants
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_nr1)[which(contamdf.m_nr1$contaminant == TRUE)]),]
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_nr2)[which(contamdf.m_nr2$contaminant == TRUE)]),]
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_r1)[which(contamdf.m_r1$contaminant == TRUE)]),]
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_r2)[which(contamdf.m_r2$contaminant == TRUE)]),]
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_r4)[which(contamdf.m_r4$contaminant == TRUE)]),]
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_r5)[which(contamdf.m_r5$contaminant == TRUE)]),]
+m_raw_tax[which(rownames(m_raw_tax) %in% rownames(contamdf.m_r6)[which(contamdf.m_r6$contaminant == TRUE)]),]
+
+# remove contaminants
+m_nr1 <- prune_taxa(!contamdf.m_nr1$contaminant, ps_m_nr1)
+m_nr2 <- prune_taxa(!contamdf.m_nr2$contaminant, ps_m_nr2)
+m_r1 <- prune_taxa(!contamdf.m_r1$contaminant, ps_m_r1)
+m_r2 <- prune_taxa(!contamdf.m_r2$contaminant, ps_m_r2)
+m_r3 <- prune_taxa(!contamdf.m_r3$contaminant, ps_m_r3)
+m_r4 <- prune_taxa(!contamdf.m_r4$contaminant, ps_m_r4)
+m_r5 <- prune_taxa(!contamdf.m_r5$contaminant, ps_m_r5)
+m_r6 <- prune_taxa(!contamdf.m_r6$contaminant, ps_m_r6)
+
+# merge back into one dataset
+ps_m_decontam <- merge_phyloseq(m_nr1, m_nr2)
+ps_m_decontam <- merge_phyloseq(ps_m_decontam, m_r1)
+ps_m_decontam <- merge_phyloseq(ps_m_decontam, m_r2)
+ps_m_decontam <- merge_phyloseq(ps_m_decontam, m_r3)
+ps_m_decontam <- merge_phyloseq(ps_m_decontam, m_r4)
+ps_m_decontam <- merge_phyloseq(ps_m_decontam, m_r5)
+ps_m_decontam <- merge_phyloseq(ps_m_decontam, m_r6)
+
+# remove negative controls
+ps_m_decontam <- subset_samples(ps_m_decontam, sample_type == "Soil")
+
+# remove mitochondria, chloroplast, and unassigned kingdom reads
+ps_m_decontam <- subset_taxa(ps_m_decontam, 
+                                Kingdom != "Unassigned")
+ps_m_decontam <- subset_taxa(ps_m_decontam, 
+                                Kingdom != "d__Eukaryota")
+ps_m_decontam <- subset_taxa(ps_m_decontam, 
+                                Family != " f__Mitochondria")
+ps_m_decontam <- subset_taxa(ps_m_decontam, 
+                                Order != " o__Chloroplast")
+
+# write asv table to csv
+m_decontam <- as.data.frame(as.matrix(ps_m_decontam@otu_table))
+write.csv(m_decontam,
+"/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/m_16s_asv_decontam.csv")
+```
+
+```{r decontaminate o soils}
+## O Soils
+# run decontam for each batch
+contamdf.o_nr1 <- isContaminant(ps_o_nr1, neg = "is_control", method = "prevalence")
+contamdf.o_nr2 <- isContaminant(ps_o_nr2, neg = "is_control", method = "prevalence")
+contamdf.o_r1 <- isContaminant(ps_o_r1, conc = "dna_conc", method = "frequency")
+contamdf.o_r4 <- isContaminant(ps_o_r4, neg = "is_control", method = "prevalence")
+contamdf.o_rerun <- isContaminant(ps_o_rerun, neg = "is_control", method = "prevalence")
+
+# visualize contaminants
+# nr1
+ps_o_nr1_pa <- transform_sample_counts(ps_o_nr1, function(abund) 1*(abund>0))
+ps_o_nr1_neg <- prune_samples(sample_data(ps_o_nr1)$is_control == TRUE, ps_o_nr1)
+ps_o_nr1_pos <- prune_samples(sample_data(ps_o_nr1)$is_control == FALSE, ps_o_nr1)
+df_ps_o_nr1 <- data.frame(ps_o_nr1_pos=taxa_sums(ps_o_nr1_pos), ps_o_nr1_neg=taxa_sums(ps_o_nr1_neg),
+                      contaminant=contamdf.o_nr1$contaminant)
+ggplot(data=df_ps_o_nr1, aes(x=ps_o_nr1_neg, y=ps_o_nr1_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("O Nahuel Run 1") + theme_bw()
+# nr2
+ps_o_nr2_pa <- transform_sample_counts(ps_o_nr2, function(abund) 1*(abund>0))
+ps_o_nr2_neg <- prune_samples(sample_data(ps_o_nr2)$is_control == TRUE, ps_o_nr2)
+ps_o_nr2_pos <- prune_samples(sample_data(ps_o_nr2)$is_control == FALSE, ps_o_nr2)
+df_ps_o_nr2 <- data.frame(ps_o_nr2_pos=taxa_sums(ps_o_nr2_pos), ps_o_nr2_neg=taxa_sums(ps_o_nr2_neg),
+                      contaminant=contamdf.o_nr2$contaminant)
+ggplot(data=df_ps_o_nr2, aes(x=ps_o_nr2_neg, y=ps_o_nr2_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("O Nahuel Run 2") + theme_bw()
+# r1
+plot_frequency(ps_o_r1, taxa_names(ps_o_r1)[sample(which(contamdf.o_r1$contaminant),40)], conc="dna_conc") +
+    xlab("DNA Concentration")
+# r4
+ps_o_r4_pa <- transform_sample_counts(ps_o_r4, function(abund) 1*(abund>0))
+ps_o_r4_neg <- prune_samples(sample_data(ps_o_r4)$is_control == TRUE, ps_o_r4)
+ps_o_r4_pos <- prune_samples(sample_data(ps_o_r4)$is_control == FALSE, ps_o_r4)
+df_ps_o_r4 <- data.frame(ps_o_r4_pos=taxa_sums(ps_o_r4_pos), ps_o_r4_neg=taxa_sums(ps_o_r4_neg),
+                      contaminant=contamdf.o_r4$contaminant)
+ggplot(data=df_ps_o_r4, aes(x=ps_o_r4_neg, y=ps_o_r4_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("O Run 4") + theme_bw()
+# r6
+ps_o_rerun_pa <- transform_sample_counts(ps_o_rerun, function(abund) 1*(abund>0))
+ps_o_rerun_neg <- prune_samples(sample_data(ps_o_rerun)$is_control == TRUE, ps_o_rerun)
+ps_o_rerun_pos <- prune_samples(sample_data(ps_o_rerun)$is_control == FALSE, ps_o_rerun)
+df_ps_o_rerun <- data.frame(ps_o_rerun_pos=taxa_sums(ps_o_rerun_pos), ps_o_rerun_neg=taxa_sums(ps_o_rerun_neg),
+                      contaminant=contamdf.o_rerun$contaminant)
+ggplot(data=df_ps_o_rerun, aes(x=ps_o_rerun_neg, y=ps_o_rerun_pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + ggtitle("O ReRun") + theme_bw()
+
+# identify contaminants
+o_raw_tax[which(rownames(o_raw_tax) %in% rownames(contamdf.o_nr1)[which(contamdf.o_nr1$contaminant == TRUE)]),]
+o_raw_tax[which(rownames(o_raw_tax) %in% rownames(contamdf.o_nr2)[which(contamdf.o_nr2$contaminant == TRUE)]),]
+o_raw_tax[which(rownames(o_raw_tax) %in% rownames(contamdf.o_r1)[which(contamdf.o_r1$contaminant == TRUE)]),]
+o_raw_tax[which(rownames(o_raw_tax) %in% rownames(contamdf.o_r4)[which(contamdf.o_r4$contaminant == TRUE)]),]
+o_raw_tax[which(rownames(o_raw_tax) %in% rownames(contamdf.o_rerun)[which(contamdf.o_rerun$contaminant == TRUE)]),]
+
+# remove contaminants
+o_nr1 <- prune_taxa(!contamdf.o_nr1$contaminant, ps_o_nr1)
+o_nr2 <- prune_taxa(!contamdf.o_nr2$contaminant, ps_o_nr2)
+o_r1 <- prune_taxa(!contamdf.o_r1$contaminant, ps_o_r1)
+o_r4 <- prune_taxa(!contamdf.o_r4$contaminant, ps_o_r4)
+o_rerun <- prune_taxa(!contamdf.o_rerun$contaminant, ps_o_rerun)
+
+# merge back into one dataset
+ps_o_decontam <- merge_phyloseq(o_nr1, o_nr2)
+ps_o_decontam <- merge_phyloseq(ps_o_decontam, o_r1)
+ps_o_decontam <- merge_phyloseq(ps_o_decontam, o_r4)
+ps_o_decontam <- merge_phyloseq(ps_o_decontam, o_rerun)
+
+# remove negative controls
+ps_o_decontam <- subset_samples(ps_o_decontam, sample_type == "Soil")
+
+# remove mitochondria, chloroplast, and unassigned kingdom reads
+ps_o_decontam <- subset_taxa(ps_o_decontam, 
+                                Kingdom != "Unassigned")
+ps_o_decontam <- subset_taxa(ps_o_decontam, 
+                                Kingdom != "d__Eukaryota")
+ps_o_decontam <- subset_taxa(ps_o_decontam, 
+                                Family != " f__Mitochondria")
+ps_o_decontam <- subset_taxa(ps_o_decontam, 
+                                Order != " o__Chloroplast")
+
+# write asv table to csv
+o_decontam <- as.data.frame(as.matrix(ps_o_decontam@otu_table))
+write.csv(o_decontam,
+          "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/o_16s_asv_decontam.csv")
+```
+
+```{r edit the metadata to add post-decontam seq count}
+# merge all decontam into one object
+ps_16s_decontam <- merge_phyloseq(ps_leaf_decontam, ps_root_decontam)
+ps_16s_decontam <- merge_phyloseq(ps_16s_decontam, ps_m_decontam)
+ps_16s_decontam <- merge_phyloseq(ps_16s_decontam, ps_o_decontam)
+
+decontam_sample_sums <- sample_sums(ps_16s_decontam)
+
+metadata_16s_all$seq_count_decontam <- NA
+for(i in 1:nrow(metadata_16s_all)){
+  sample <- names(decontam_sample_sums)[i]
+  metadata_16s_all$seq_count_decontam[which(metadata_16s_all$sample_name == sample)] <- decontam_sample_sums[i]
+}
+
+outliers <- c("HF069_D3_small_L2_16S_S181",
+              "HF04_QR_Y_edge_L1_16S_S115", "HF06_QR_M_int_L2_16S_S114",
+              "HF06_QR_M_int_L1_16S_S104", 
+              "BM03_QR_Y_int_PS_L2_16S_S102", "AB_QR_M_1_L_1_16S_S8",
+              "HF06_QR_O_edge_L2_16S_S145", "SW08_QR_M_int_L1_16S_S141",
+              "HF06_QR_M_int_L3_16S_S153", "BB_QR_O_1_L2_16S_S253",
+              "HF04_QR_M_int_L2_16S_S297", "AA01_QR_Y_edge_R2_16S_S129",
+              "HF06_QR_M_int_R2_16S_S124", "JP_QR_Y_pit_R2_16S_S195",
+              "JP_QR_O_pit_R2_16S_S251", 
+              "HF04_QR_O_int_big_R1_16S_S183", 
+              "HF06_QR_O_edge_R2_16S_S138", 
+              "HF04_QR_Y_edge_R1_16S_S185", 
+              "HF06_QR_O_edge_R1_16S_S191", "HF06_QR_M_int_R1_16S_S120",
+              "HF06_QR_Y_int_R1_16S_S196", 
+              "HF04_QR_O_int_big_R2_16S_S120", 
+              "HF069_E3_765_R1_16S_S242","SW08_QR_O_edge_O1_16S_S128",
+              "SW08_QR_M_int_O1_16S_S135","HW07_QR_Y_edge_O1_16S_S192",
+              "SB_QR_O_pit_O2_16S_S39")
+
+metadata_16s_all$sequences_dropped[which(metadata_16s_all$sample_name %in% outliers)] <- "Outlier"
+
+metadata_16s_all$sequences_dropped[which(metadata_16s_all$sample_type == "Leaf" & metadata_16s_all$seq_count_dada2 < 10000)] <- "Filtered Out"
+metadata_16s_all$sequences_dropped[which(metadata_16s_all$sample_type == "Root" & metadata_16s_all$seq_count_dada2 < 10000)] <- "Filtered Out"
+metadata_16s_all$sequences_dropped[which(metadata_16s_all$sample_type == "Soil" & metadata_16s_all$seq_count_dada2 < 8000)] <- "Filtered Out"
+
+metadata_16s <- metadata_16s_all[which(!is.na(metadata_16s_all$sample_name)),]
+
+write.csv(metadata_16s_all,
+          "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Data/metadata_16s_new.csv", 
+          row.names = FALSE)
+```
+
+```{r show how decontam has impacted sequence depth}
+metadata_leaf <- metadata_16s[which(metadata_16s$sample_type == "Leaf"),]
+metadata_root <- metadata_16s[which(metadata_16s$sample_type == "Root"),]
+metadata_m <- metadata_16s[which((metadata_16s$sample_type == "Soil") & (metadata_16s$soil_horizon == "M")),]
+metadata_o <- metadata_16s[which((metadata_16s$sample_type == "Soil") & (metadata_16s$soil_horizon == "O")),]
+
+ggplot(metadata_leaf, aes(as.numeric(seq_count_decontam), fill = sequencing_batch)) + geom_histogram(binwidth = 1000) + theme_bw() + ggtitle("Leaf Sequencing Depth after decontam") + geom_vline(aes(xintercept=median(as.numeric(seq_count_decontam), na.rm = TRUE)), color="blue", linetype="dashed") + geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), color="red", linetype="dashed")
+ggplot(metadata_root, aes(as.numeric(seq_count_decontam), fill = sequencing_batch)) + geom_histogram(binwidth = 1000) + theme_bw() + ggtitle("Root Sequencing Depth after decontam") + geom_vline(aes(xintercept=median(as.numeric(seq_count_decontam), na.rm = TRUE)), color="blue", linetype="dashed") + geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), color="red", linetype="dashed")
+ggplot(metadata_m, aes(as.numeric(seq_count_decontam), fill = sequencing_batch)) + geom_histogram(binwidth = 1000) + theme_bw() + ggtitle("M Soil Sequencing Depth after decontam") + geom_vline(aes(xintercept=median(as.numeric(seq_count_decontam), na.rm = TRUE)), color="blue", linetype="dashed") + geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), color="red", linetype="dashed")
+ggplot(metadata_o, aes(as.numeric(seq_count_decontam), fill = sequencing_batch)) + geom_histogram(binwidth = 1000) + theme_bw() + ggtitle("O Soil Sequencing Depth after decontam") + geom_vline(aes(xintercept=median(as.numeric(seq_count_decontam), na.rm = TRUE)), color="blue", linetype="dashed") + geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), color="red", linetype="dashed")
+
+metadata_leaf <- as.data.frame(as.matrix(ps_leaf_decontam@sam_data))
+metadata_root <- as.data.frame(as.matrix(ps_root_decontam@sam_data))
+metadata_m <- as.data.frame(as.matrix(ps_m_decontam@sam_data))
+metadata_o <- as.data.frame(as.matrix(ps_o_decontam@sam_data))
+
+leaf_asv <- as.data.frame(as.matrix(ps_leaf_decontam@otu_table))
+root_asv <- as.data.frame(as.matrix(ps_root_decontam@otu_table))
+m_asv <- as.data.frame(as.matrix(ps_m_decontam@otu_table))
+o_asv <- as.data.frame(as.matrix(ps_o_decontam@otu_table))
+```
+
+```{r check for batch effect}
+# make a transposed verison of the o sequencing data
+d16s_leaf_t <- as.data.frame(t(leaf_asv))
+
+# calculate Aitchison distance for o samples
+aitch_leaf <- aDist(d16s_leaf_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+aitch_leaf <- as.matrix(aitch_leaf)
+
+# test for sequencing batch and depth effect
+adonis2(aitch_leaf~as.factor(metadata_leaf$sequencing_batch))
+adonis2(aitch_leaf~as.factor(metadata_leaf$tree_type))
+adonis2(aitch_leaf~as.factor(metadata_leaf$tree_age))
+adonis2(aitch_leaf~as.factor(metadata_leaf$tree_pit_type))
+adonis2(aitch_leaf~as.factor(metadata_leaf$tree_species))
+adonis2(aitch_leaf~as.factor(metadata_leaf$site_name))
+
+
+all.MDS_leaf<-metaMDS(aitch_leaf,k=2,zerodist="add")
+leaf.coordinates<-data.frame(scores(all.MDS_leaf))
+leaf.coordinates <- cbind(leaf.coordinates, metadata_leaf)
+
+# plot samples by different variables
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_text(aes(label = row.names(leaf.coordinates))) + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect") + ylim(c(10,15))
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_age))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_pit_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_species))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+ggplot(leaf.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(site_name))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Leaf Batch Effect")
+
+
+# make a transposed verison of the o sequencing data
+d16s_root_t <- as.data.frame(t(root_asv))
+
+# calculate Aitchison distance for o samples
+aitch_root <- aDist(d16s_root_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+aitch_root <- as.matrix(aitch_root)
+
+# test for sequencing batch and depth effect
+adonis2(aitch_root~as.factor(metadata_root$sequencing_batch))
+adonis2(aitch_root~as.factor(metadata_root$tree_type))
+adonis2(aitch_root~as.factor(metadata_root$tree_age))
+adonis2(aitch_root~as.factor(metadata_root$tree_pit_type))
+adonis2(aitch_root~as.factor(metadata_root$tree_species))
+adonis2(aitch_root~as.factor(metadata_root$site_name))
+adonis2(aitch_root~as.factor(metadata_root$soil_horizon))
+
+
+all.MDS_root<-metaMDS(aitch_root,k=2,zerodist="add")
+root.coordinates<-data.frame(scores(all.MDS_root))
+root.coordinates <- cbind(root.coordinates, metadata_root)
+
+# plot samples by different variables
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("Root Batch Effect")
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("root Batch Effect")
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_age))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("root Batch Effect")
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_pit_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("root Batch Effect")
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_species))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("root Batch Effect")
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(site_name))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("root Batch Effect")
+ggplot(root.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(soil_horizon))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("root Batch Effect")
+
+
+# make a transposed verison of the o sequencing data
+d16s_m_t <- as.data.frame(t(m_asv))
+
+# calculate Aitchison distance for o samples
+aitch_m <- aDist(d16s_m_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+aitch_m <- as.matrix(aitch_m)
+
+# test for sequencing batch and depth effect
+adonis2(aitch_m~as.factor(metadata_m$sequencing_batch))
+adonis2(aitch_m~as.factor(metadata_m$tree_type))
+adonis2(aitch_m~as.factor(metadata_m$tree_age))
+adonis2(aitch_m~as.factor(metadata_m$tree_pit_type))
+adonis2(aitch_m~as.factor(metadata_m$tree_species))
+adonis2(aitch_m~as.factor(metadata_m$site_name))
+
+
+all.MDS_m<-metaMDS(aitch_m,k=2,zerodist="add")
+m.coordinates<-data.frame(scores(all.MDS_m))
+m.coordinates <- cbind(m.coordinates, metadata_m)
+
+# plot samples by different variables
+ggplot(m.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("M Batch Effect")
+ggplot(m.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("m Batch Effect")
+ggplot(m.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_age))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("m Batch Effect")
+ggplot(m.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_pit_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("m Batch Effect")
+ggplot(m.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_species))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("m Batch Effect")
+ggplot(m.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(site_name))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("m Batch Effect")
+
+
+# make a transposed verison of the o sequencing data
+d16s_o_t <- as.data.frame(t(o_asv))
+
+# calculate Aitchison distance for o samples
+aitch_o <- aDist(d16s_o_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+aitch_o <- as.matrix(aitch_o)
+
+# test for sequencing batch and depth effect
+adonis2(aitch_o~as.factor(metadata_o$sequencing_batch))
+adonis2(aitch_o~as.factor(metadata_o$tree_type))
+adonis2(aitch_o~as.factor(metadata_o$tree_age))
+adonis2(aitch_o~as.factor(metadata_o$tree_pit_type))
+adonis2(aitch_o~as.factor(metadata_o$tree_species))
+adonis2(aitch_o~as.factor(metadata_o$site_name))
+
+all.MDS_o<-metaMDS(aitch_o,k=2,zerodist="add")
+o.coordinates<-data.frame(scores(all.MDS_o))
+o.coordinates <- cbind(o.coordinates, metadata_o)
+
+# plot samples by different variables
+ggplot(o.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(sequencing_batch))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("O Batch Effect")
+ggplot(o.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("o Batch Effect")
+ggplot(o.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_age))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("o Batch Effect")
+ggplot(o.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_pit_type))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("o Batch Effect")
+ggplot(o.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(tree_species))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("o Batch Effect")
+ggplot(o.coordinates, aes(x = NMDS1, y = NMDS2, col = as.factor(site_name))) + geom_point() + stat_ellipse() + theme_bw() + ggtitle("o Batch Effect")
+```
+
+```{r rarefy}
+# load data
+leaf_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/leaf_16s_asv_decontam.csv", row.names = 1)
+root_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/root_16s_asv_decontam.csv", row.names = 1)
+m_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/m_16s_asv_decontam.csv", row.names = 1)
+o_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/o_16s_asv_decontam.csv", row.names = 1)
+
+# load taxonomy data 
+tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Raw_Data/16S/tax_16s_allruns.csv", row.names = 1)
+tax$Phylum <- gsub(" ", "", tax$Phylum)
+tax$Class <- gsub(" ", "", tax$Class)
+tax$Order <- gsub(" ", "", tax$Order)
+tax$Family <- gsub(" ", "", tax$Family)
+tax$Genus <- gsub(" ", "", tax$Genus)
+tax$Species <- gsub(" ", "", tax$Species)
+
+# reformat metadata
+metadata_16s <- as.data.frame(metadata_16s)
+rownames(metadata_16s) <- metadata_16s$sample_name
+metadata_16s <- metadata_16s[,-1]
+
+# make phyloseq objects
+leaf <- otu_table(leaf_decontam, taxa_are_rows = TRUE)
+root <- otu_table(root_decontam, taxa_are_rows = TRUE)
+m <- otu_table(m_decontam, taxa_are_rows = TRUE)
+o <- otu_table(o_decontam, taxa_are_rows = TRUE)
+
+tax <- tax_table(as.matrix(tax))
+
+leaf_meta <- sample_data(metadata_16s[which(rownames(metadata_16s) %in% colnames(leaf_decontam)),])
+root_meta <- sample_data(metadata_16s[which(rownames(metadata_16s) %in% colnames(root_decontam)),])
+m_meta <- sample_data(metadata_16s[which(rownames(metadata_16s) %in% colnames(m_decontam)),])
+o_meta <- sample_data(metadata_16s[which(rownames(metadata_16s) %in% colnames(o_decontam)),])
+
+leaf_ps <- phyloseq(leaf, tax, leaf_meta)
+root_ps <- phyloseq(root, tax, root_meta)
+m_ps <- phyloseq(m, tax, m_meta)
+o_ps <- phyloseq(o, tax, o_meta)
+
+length(rowSums(leaf_decontam) > 0)
+length(rowSums(root_decontam) > 0)
+length(rowSums(m_decontam) > 0)
+length(rowSums(o_decontam) > 0)
+
+# rarefy
+set.seed(1)
+leaf_ps_rare_100 <- rarefy_even_depth(leaf_ps, rngseed=1, sample.size=100, replace=F)
+leaf_ps_rare_200 <- rarefy_even_depth(leaf_ps, rngseed=1, sample.size=200, replace=F)
+leaf_ps_rare_300 <- rarefy_even_depth(leaf_ps, rngseed=1, sample.size=300, replace=F)
+root_ps_rare <- rarefy_even_depth(root_ps, rngseed=1, sample.size=min(sample_sums(root_ps)), replace=F)
+m_ps_rare <- rarefy_even_depth(m_ps, rngseed=1, sample.size=min(sample_sums(m_ps)), replace=F)
+o_ps_rare <- rarefy_even_depth(o_ps, rngseed=1, sample.size=min(sample_sums(o_ps)), replace=F)
+
+# extract the asv table from the rarefied data
+leaf_rare_100 <- as.data.frame(as.matrix(leaf_ps_rare_100@otu_table))
+leaf_rare_200 <- as.data.frame(as.matrix(leaf_ps_rare_200@otu_table))
+leaf_rare_300 <- as.data.frame(as.matrix(leaf_ps_rare_300@otu_table))
+root_rare <- as.data.frame(as.matrix(root_ps_rare@otu_table))
+m_rare <- as.data.frame(as.matrix(m_ps_rare@otu_table))
+o_rare <- as.data.frame(as.matrix(o_ps_rare@otu_table))
+
+# write to files
+write.csv(leaf_rare_100, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_100.csv")
+write.csv(leaf_rare_200, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_200.csv")
+write.csv(leaf_rare_300, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_300.csv")
+write.csv(root_rare, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/root_16s_asv_rarefied.csv")
+write.csv(m_rare, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/m_16s_asv_rarefied.csv")
+write.csv(o_rare, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/o_16s_asv_rarefied.csv")
+
+# format data for plotting
+leaf_rare$asv <- rownames(leaf_rare)
+root_rare$asv <- rownames(root_rare)
+m_rare$asv <- rownames(m_rare)
+o_rare$asv <- rownames(o_rare)
+leaf_decontam$asv <- rownames(leaf_decontam)
+root_decontam$asv <- rownames(root_decontam)
+m_decontam$asv <- rownames(m_decontam)
+o_decontam$asv <- rownames(o_decontam)
+
+leaf_long <- pivot_longer(leaf_rare, !asv, names_to = "sample", values_to = "rarefied_count")
+root_long <- pivot_longer(root_rare, !asv, names_to = "sample", values_to = "rarefied_count")
+m_long <- pivot_longer(m_rare, !asv, names_to = "sample", values_to = "rarefied_count")
+o_long <- pivot_longer(o_rare, !asv, names_to = "sample", values_to = "rarefied_count")
+leaf_long_pre <- pivot_longer(leaf_decontam, !asv, names_to = "sample", values_to = "decontam_count")
+root_long_pre <- pivot_longer(root_decontam, !asv, names_to = "sample", values_to = "decontam_count")
+m_long_pre <- pivot_longer(m_decontam, !asv, names_to = "sample", values_to = "decontam_count")
+o_long_pre <- pivot_longer(o_decontam, !asv, names_to = "sample", values_to = "decontam_count")
+
+leaf_compare <- merge(leaf_long, leaf_long_pre, by = c("asv", "sample"))
+root_compare <- merge(root_long, root_long_pre, by = c("asv", "sample"))
+m_compare <- merge(m_long, m_long_pre, by = c("asv", "sample"))
+o_compare <- merge(o_long, o_long_pre, by = c("asv", "sample"))
+
+tax$asv <- rownames(tax)
+
+leaf_compare <- merge(leaf_compare, tax, by = "asv")
+root_compare <- merge(root_compare, tax, by = "asv")
+m_compare <- merge(m_compare, tax, by = "asv")
+o_compare <- merge(o_compare, tax, by = "asv")
+
+# plot change
+ggplot(leaf_compare, aes(x = decontam_count, y = rarefied_count, col = Phylum)) + geom_point() + theme_bw() + ggtitle("Leaf Pre- and Post- Rarefaction")
+ggplot(root_compare, aes(x = decontam_count, y = rarefied_count, col = Phylum)) + geom_point() + theme_bw() + ggtitle("Root Pre- and Post- Rarefaction")
+ggplot(m_compare, aes(x = decontam_count, y = rarefied_count, col = Phylum)) + geom_point() + theme_bw() + ggtitle("M Soil Pre- and Post- Rarefaction")
+ggplot(o_compare, aes(x = decontam_count, y = rarefied_count, col = Phylum)) + geom_point() + theme_bw() + ggtitle("O Soil Pre- and Post- Rarefaction")
+
+ggplot(leaf_compare, aes(x = decontam_count, y = rarefied_count, col = sample)) + geom_point() + theme_bw() + ggtitle("Leaf Pre- and Post- Rarefaction")
+ggplot(root_compare, aes(x = decontam_count, y = rarefied_count, col = sample)) + geom_point() + theme_bw() + ggtitle("Root Pre- and Post- Rarefaction")
+ggplot(m_compare, aes(x = decontam_count, y = rarefied_count, col = sample)) + geom_point() + theme_bw() + ggtitle("M Soil Pre- and Post- Rarefaction")
+ggplot(o_compare, aes(x = decontam_count, y = rarefied_count, col = sample)) + geom_point() + theme_bw() + ggtitle("O Soil Pre- and Post- Rarefaction")
+
+# plot rarefaction curves
+rarecurve(t(leaf_decontam), step = 20, sample = min(colSums(leaf_decontam)), col = "blue")
+rarecurve(t(root_decontam), step = 20, sample = min(colSums(root_decontam)), col = "blue", label = FALSE)
+rarecurve(t(m_decontam), step = 20, sample = min(colSums(m_decontam)), col = "blue", label = FALSE)
+rarecurve(t(o_decontam), step = 20, sample = min(colSums(o_decontam)), col = "blue", label = FALSE)
+```
+
+```{r batch correction }
+library(sva)
+# all_decontam <- merge(leaf_decontam, root_decontam, by = 0, all = T)
+all_decontam <- merge(o_decontam, root_decontam, by = 0, all = T)
+# all_decontam <- merge(all_decontam, o_decontam, by.x = "Row.names", by.y = 0, all = T)
+all_decontam <- merge(all_decontam, m_decontam, by.x = "Row.names", by.y = 0, all = T)
+row.names(all_decontam) <- all_decontam$Row.names
+all_decontam <- all_decontam[,-1]
+all_decontam <- all_decontam[,order(colnames(all_decontam))]
+all_decontam <- as.matrix(all_decontam)
+
+all_decontam <- all_decontam[which(rowSums(all_decontam) > 0), which(colSums(all_decontam) > 0)]
+
+metadata_16s_samples <- metadata_16s[which(row.names(metadata_16s) %in% colnames(all_decontam)),]
+metadata_16s_samples <- metadata_16s_samples[order(row.names(metadata_16s_samples)),]
+batch <- paste0(metadata_16s_samples$sample_type, " ", metadata_16s_samples$soil_horizon)
+batch <- gsub(" NA", "", batch)
+batch <- gsub("Root.*", "Root", batch)
+age <- metadata_16s_samples$tree_age
+type <- metadata_16s_samples$tree_pit_type
+covar_mod <- data.frame(age, type)
+
+all_batch_correct <- ComBat_seq(all_decontam, batch, group=NULL, covar_mod)
+
+min(colSums(all_batch_correct))
+hist(colSums(all_batch_correct))
+hist(colSums(all_decontam))
+```
+
+```{r clr transform}
+leaf_clr <- as.data.frame(clr(leaf_decontam+1))
+root_clr <- as.data.frame(clr(root_decontam+1))
+m_clr <- as.data.frame(clr(m_decontam+1))
+o_clr <- as.data.frame(clr(o_decontam+1))
+all_clr <- as.data.frame(clr(all_batch_correct+1))
+
+all_clr <- merge(leaf_clr, root_clr, by = 0, all.x = T, all.y = T)
+all_clr <- merge(all_clr, m_clr, by.x = "Row.names", by.y = 0, all.x = T, all.y = T)
+all_clr <- merge(all_clr, o_clr, by.x = "Row.names", by.y = 0, all.x = T, all.y = T)
+rownames(all_clr) <- all_clr$Row.names
+all_clr <- all_clr[,-1]
+write.csv(all_clr, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/all_16s_asv_clr_concat.csv", row.names = TRUE)
+```
+
+```{r z-score transformation}
+# load data
+leaf_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/leaf_16s_asv_decontam.csv", row.names = 1)
+root_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/root_16s_asv_decontam.csv", row.names = 1)
+m_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/m_16s_asv_decontam.csv", row.names = 1)
+o_decontam <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/o_16s_asv_decontam.csv", row.names = 1)
+
+metadata_16s <- metadata_16s_all[which(metadata_16s_all$sequences_dropped == "No"),]
+
+leaf_decontam <- leaf_decontam[,which(colnames(leaf_decontam) %in% metadata_16s$sample_name)]
+root_decontam <- root_decontam[,which(colnames(root_decontam) %in% metadata_16s$sample_name)]
+m_decontam <- m_decontam[,which(colnames(m_decontam) %in% metadata_16s$sample_name)]
+o_decontam <- o_decontam[,which(colnames(o_decontam) %in% metadata_16s$sample_name)]
+
+all_decontam <- merge(leaf_decontam, root_decontam, by = 0, all.x = T, all.y = T)
+all_decontam <- merge(all_decontam, m_decontam, by.x ="Row.names", by.y = 0, all.x = T, all.y = T)
+all_decontam <- merge(all_decontam, o_decontam, by.x ="Row.names", by.y = 0, all.x = T, all.y = T)
+colnames(all_decontam)[1] <- "ASV_ID"
+
+write.table(all_decontam, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Decontam/16S/all_16s_asv_decontam_concat.txt", quote = F, sep = "\t", row.names = FALSE)
+
+leaf_z <- as.data.frame(scale(leaf_decontam, center = TRUE, scale = TRUE))
+root_z <- as.data.frame(scale(root_decontam, center = TRUE, scale = TRUE))
+m_z <- as.data.frame(scale(m_decontam, center = TRUE, scale = TRUE))
+o_z <- as.data.frame(scale(o_decontam, center = TRUE, scale = TRUE))
+
+write.csv(leaf_z, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/ZScore/16S/leaf_16s_asv_zscore.csv", row.names = TRUE)
+write.csv(root_z, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/ZScore/16S/root_16s_asv_zscore.csv", row.names = TRUE)
+write.csv(m_z, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/ZScore/16S/m_16s_asv_zscore.csv", row.names = TRUE)
+write.csv(o_z, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/ZScore/16S/o_16s_asv_zscore.csv", row.names = TRUE)
+
+all_z <- merge(leaf_z, root_z, by = 0, all.x = T, all.y = T)
+all_z <- merge(all_z, m_z, by.x = "Row.names", by.y = 0, all.x = T, all.y = T)
+all_z <- merge(all_z, o_z, by.x = "Row.names", by.y = 0, all.x = T, all.y = T)
+rownames(all_z) <- all_z$Row.names
+all_z <- all_z[,-1]
+write.csv(all_z, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/ZScore/16S/all_16s_asv_zscore.csv", row.names = TRUE)
+```
+
+```{r Aitchison distance calculation}
+leaf_aitch <- aDist(t(leaf_decontam+1), y = NULL)
+root_aitch <- aDist(t(root_decontam+1), y = NULL)
+m_aitch <- aDist(t(m_decontam+1), y = NULL)
+o_aitch <- aDist(t(o_decontam+1), y = NULL)
+all_aitch <- aDist(t(all_batch_correct+1), y = NULL)
+
+leaf_aitch <- as.matrix(leaf_aitch)
+root_aitch <- as.matrix(root_aitch)
+m_aitch <- as.matrix(m_aitch)
+o_aitch <- as.matrix(o_aitch)
+all_aitch <- as.matrix(all_aitch)
+```
+
+```{r merge taxonomy and counts}
+leaf_rare_tax_100 <- merge(tax, leaf_rare_100, by.x = 0, by.y = "X", all.y = TRUE)
+leaf_rare_tax_200 <- merge(tax, leaf_rare_200, by.x = 0, by.y = "X", all.y = TRUE)
+leaf_rare_tax_300 <- merge(tax, leaf_rare_300, by.x = 0, by.y = "X", all.y = TRUE)
+leaf_rare_tax_100 <- leaf_rare_tax_100[,-1]
+leaf_rare_tax_200 <- leaf_rare_tax_200[,-1]
+leaf_rare_tax_300 <- leaf_rare_tax_300[,-1]
+root_rare_tax <- merge(tax, root_rare, by.x = 0, by.y = "X", all.y = TRUE)
+root_rare_tax <- root_rare_tax[,-1]
+m_rare_tax <- merge(tax, m_rare, by.x = 0, by.y = "X", all.y = TRUE)
+m_rare_tax <- m_rare_tax[,-1]
+o_rare_tax <- merge(tax, o_rare, by.x = 0, by.y = "X", all.y = TRUE)
+o_rare_tax <- o_rare_tax[,-1]
+
+write.csv(leaf_rare_tax_100, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_wtax_100_asvid.csv")
+write.csv(leaf_rare_tax_200, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_wtax_200_asvid.csv")
+write.csv(leaf_rare_tax_300, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_wtax_300_asvid.csv")
+write.csv(root_rare_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/root_16s_asv_rarefied_wtax_asvid.csv")
+write.csv(m_rare_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/m_16s_asv_rarefied_wtax_asvid.csv")
+write.csv(o_rare_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/o_16s_asv_rarefied_wtax_asvid.csv")
+
+leaf_clr_tax <- merge(tax, leaf_clr, by = 0, all.y = TRUE)
+leaf_clr_tax <- leaf_clr_tax[,-1]
+root_clr_tax <- merge(tax, root_clr, by = 0, all.y = TRUE)
+root_clr_tax <- root_clr_tax[,-1]
+m_clr_tax <- merge(tax, m_clr, by = 0, all.y = TRUE)
+m_clr_tax <- m_clr_tax[,-1]
+o_clr_tax <- merge(tax, o_clr, by = 0, all.y = TRUE)
+o_clr_tax <- o_clr_tax[,-1]
+
+write.csv(leaf_clr_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/leaf_16s_asv_clr_wtax.csv")
+write.csv(root_clr_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/root_16s_asv_clr_wtax.csv")
+write.csv(m_clr_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/m_16s_asv_clr_wtax.csv")
+write.csv(o_clr_tax, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/o_16s_asv_clr_wtax.csv")
+
+write.csv(leaf_aitch, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Aitchison_Distance/16S/leaf_16s_sample_aitch.csv")
+write.csv(root_aitch, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Aitchison_Distance/16S/root_16s_sample_aitch.csv")
+write.csv(m_aitch, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Aitchison_Distance/16S/m_16s_sample_aitch.csv")
+write.csv(o_aitch, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Aitchison_Distance/16S/o_16s_sample_aitch.csv")
+write.csv(all_aitch, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Aitchison_Distance/16S/all_16s_sample_aitch.csv")
+```
+
+```{r add funguild info}
+# read data in
+leaf_rare_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rarefied_wtax_200_asvid.csv", row.names = 1)
+root_rare_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/root_16s_asv_rarefied_wtax_asvid.csv", row.names = 1)
+m_rare_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/m_16s_asv_rarefied_wtax_asvid.csv", row.names = 1)
+o_rare_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/o_16s_asv_rarefied_wtax_asvid.csv", row.names = 1)
+
+leaf_clr_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/leaf_16s_asv_clr_wtax.csv", row.names = 1)
+root_clr_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/root_16s_asv_clr_wtax.csv", row.names = 1)
+m_clr_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/m_16s_asv_clr_wtax.csv", row.names = 1)
+o_clr_tax <- read.csv("/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/o_16s_asv_clr_wtax.csv", row.names = 1)
+
+# read in FunGuild data
+bacterial_groups <- read.csv("/projectnb/talbot-lab-data/zrwerbin/soil_bacteria_functional_groups/reference_data/bacteria_func_groups.csv")
+species_groups <- bacterial_groups[which(bacterial_groups$Taxonomic.level == "Species"),]
+genus_groups <- bacterial_groups[which(bacterial_groups$Taxonomic.level == "Genus"),]
+family_groups <- bacterial_groups[which(bacterial_groups$Taxonomic.level == "Family"),]
+order_groups <- bacterial_groups[which(bacterial_groups$Taxonomic.level == "Order"),]
+class_groups <- bacterial_groups[which(bacterial_groups$Taxonomic.level == "Class"),]
+phylum_groups <- bacterial_groups[which(bacterial_groups$Taxonomic.level == "Phylum"),]
+
+species_groups$Taxon <- paste0("s__", species_groups$Taxon)
+species_groups$Taxon <- gsub(" ", "_", species_groups$Taxon)
+genus_groups$Taxon <- paste0("g__", genus_groups$Taxon)
+family_groups$Taxon <- paste0("f__", family_groups$Taxon)
+order_groups$Taxon <- paste0("o__", order_groups$Taxon)
+class_groups$Taxon <- paste0("c__", class_groups$Taxon)
+phylum_groups$Taxon <- paste0("p__", phylum_groups$Taxon)
+
+species_groups$Taxon <- gsub(" ", "", species_groups$Taxon)
+
+species_groups <- species_groups[,c(2,4)]
+genus_groups <- genus_groups[,c(2,4)]
+family_groups <- family_groups[,c(2,4)]
+order_groups <- order_groups[,c(2,4)]
+class_groups <- class_groups[,c(2,4)]
+phylum_groups <- phylum_groups[,c(2,4)]
+
+classification <- c()
+for(i in 1:length(unique(species_groups$Taxon))){
+  taxa <- unique(species_groups$Taxon)[i]
+  classes <- species_groups$Classification[which(species_groups$Taxon == taxa)]
+  classification <- c(classification, paste(classes, collapse = "_"))
+}
+species_groups <- data.frame(unique(species_groups$Taxon), classification)
+colnames(species_groups) <- c("Taxon", "Classification")
+
+genus_groups <- distinct(genus_groups)
+classification <- c()
+for(i in 1:length(unique(genus_groups$Taxon))){
+  taxa <- unique(genus_groups$Taxon)[i]
+  classes <- genus_groups$Classification[which(genus_groups$Taxon == taxa)]
+  classification <- c(classification, paste(classes, collapse = ", "))
+}
+genus_groups <- data.frame(unique(genus_groups$Taxon), classification)
+colnames(genus_groups) <- c("Taxon", "Classification")
+
+family_groups <- distinct(family_groups)
+classification <- c()
+for(i in 1:length(unique(family_groups$Taxon))){
+  taxa <- unique(family_groups$Taxon)[i]
+  classes <- family_groups$Classification[which(family_groups$Taxon == taxa)]
+  classification <- c(classification, paste(classes, collapse = ", "))
+}
+family_groups <- data.frame(unique(family_groups$Taxon), classification)
+colnames(family_groups) <- c("Taxon", "Classification")
+
+order_groups <- distinct(order_groups)
+classification <- c()
+for(i in 1:length(unique(order_groups$Taxon))){
+  taxa <- unique(order_groups$Taxon)[i]
+  classes <- order_groups$Classification[which(order_groups$Taxon == taxa)]
+  classification <- c(classification, paste(classes, collapse = ", "))
+}
+order_groups <- data.frame(unique(order_groups$Taxon), classification)
+colnames(order_groups) <- c("Taxon", "Classification")
+
+class_groups <- distinct(class_groups)
+classification <- c()
+for(i in 1:length(unique(class_groups$Taxon))){
+  taxa <- unique(class_groups$Taxon)[i]
+  classes <- class_groups$Classification[which(class_groups$Taxon == taxa)]
+  classification <- c(classification, paste(classes, collapse = ", "))
+}
+class_groups <- data.frame(unique(class_groups$Taxon), classification)
+colnames(class_groups) <- c("Taxon", "Classification")
+
+phylum_groups <- distinct(phylum_groups)
+classification <- c()
+for(i in 1:length(unique(phylum_groups$Taxon))){
+  taxa <- unique(phylum_groups$Taxon)[i]
+  classes <- phylum_groups$Classification[which(phylum_groups$Taxon == taxa)]
+  classification <- c(classification, paste(classes, collapse = ", "))
+}
+phylum_groups <- data.frame(unique(phylum_groups$Taxon), classification)
+colnames(phylum_groups) <- c("Taxon", "Classification")
+
+leaf_rare_tax_guild <- leaf_rare_tax
+root_rare_tax_guild <- root_rare_tax
+m_rare_tax_guild <- m_rare_tax
+o_rare_tax_guild <- o_rare_tax
+
+leaf_rare_tax_guild$guild <- NA
+root_rare_tax_guild$guild <- NA
+m_rare_tax_guild$guild <- NA
+o_rare_tax_guild$guild <- NA
+
+for(i in 1:nrow(leaf_rare_tax_guild)){
+  s <- leaf_rare_tax_guild$Species[i]
+  g <- leaf_rare_tax_guild$Genus[i]
+  f <- leaf_rare_tax_guild$Family[i]
+  o <- leaf_rare_tax_guild$Order[i]
+  c <- leaf_rare_tax_guild$Class[i]
+  p <- leaf_rare_tax_guild$Phylum[i]
+  k <- leaf_rare_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    leaf_rare_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    leaf_rare_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    leaf_rare_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    leaf_rare_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    leaf_rare_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    leaf_rare_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    leaf_rare_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+for(i in 1:nrow(root_rare_tax_guild)){
+  s <- root_rare_tax_guild$Species[i]
+  g <- root_rare_tax_guild$Genus[i]
+  f <- root_rare_tax_guild$Family[i]
+  o <- root_rare_tax_guild$Order[i]
+  c <- root_rare_tax_guild$Class[i]
+  p <- root_rare_tax_guild$Phylum[i]
+  k <- root_rare_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    root_rare_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    root_rare_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    root_rare_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    root_rare_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    root_rare_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    root_rare_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    root_rare_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+for(i in 1:nrow(m_rare_tax_guild)){
+  s <- m_rare_tax_guild$Species[i]
+  g <- m_rare_tax_guild$Genus[i]
+  f <- m_rare_tax_guild$Family[i]
+  o <- m_rare_tax_guild$Order[i]
+  c <- m_rare_tax_guild$Class[i]
+  p <- m_rare_tax_guild$Phylum[i]
+  k <- m_rare_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    m_rare_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    m_rare_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    m_rare_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    m_rare_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    m_rare_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    m_rare_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    m_rare_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+for(i in 1:nrow(o_rare_tax_guild)){
+  s <- o_rare_tax_guild$Species[i]
+  g <- o_rare_tax_guild$Genus[i]
+  f <- o_rare_tax_guild$Family[i]
+  o <- o_rare_tax_guild$Order[i]
+  c <- o_rare_tax_guild$Class[i]
+  p <- o_rare_tax_guild$Phylum[i]
+  k <- o_rare_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    o_rare_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    o_rare_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    o_rare_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    o_rare_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    o_rare_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    o_rare_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    o_rare_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+leaf_clr_tax_guild <- leaf_clr_tax
+root_clr_tax_guild <- root_clr_tax
+m_clr_tax_guild <- m_clr_tax
+o_clr_tax_guild <- o_clr_tax
+
+leaf_clr_tax_guild$guild <- NA
+root_clr_tax_guild$guild <- NA
+m_clr_tax_guild$guild <- NA
+o_clr_tax_guild$guild <- NA
+
+for(i in 1:nrow(leaf_clr_tax_guild)){
+  s <- leaf_clr_tax_guild$Species[i]
+  g <- leaf_clr_tax_guild$Genus[i]
+  f <- leaf_clr_tax_guild$Family[i]
+  o <- leaf_clr_tax_guild$Order[i]
+  c <- leaf_clr_tax_guild$Class[i]
+  p <- leaf_clr_tax_guild$Phylum[i]
+  k <- leaf_clr_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    leaf_clr_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    leaf_clr_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    leaf_clr_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    leaf_clr_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    leaf_clr_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    leaf_clr_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    leaf_clr_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+for(i in 1:nrow(root_clr_tax_guild)){
+  s <- root_clr_tax_guild$Species[i]
+  g <- root_clr_tax_guild$Genus[i]
+  f <- root_clr_tax_guild$Family[i]
+  o <- root_clr_tax_guild$Order[i]
+  c <- root_clr_tax_guild$Class[i]
+  p <- root_clr_tax_guild$Phylum[i]
+  k <- root_clr_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    root_clr_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    root_clr_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    root_clr_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    root_clr_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    root_clr_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    root_clr_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    root_clr_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+for(i in 1:nrow(m_clr_tax_guild)){
+  s <- m_clr_tax_guild$Species[i]
+  g <- m_clr_tax_guild$Genus[i]
+  f <- m_clr_tax_guild$Family[i]
+  o <- m_clr_tax_guild$Order[i]
+  c <- m_clr_tax_guild$Class[i]
+  p <- m_clr_tax_guild$Phylum[i]
+  k <- m_clr_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    m_clr_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    m_clr_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    m_clr_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    m_clr_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    m_clr_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    m_clr_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    m_clr_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+for(i in 1:nrow(o_clr_tax_guild)){
+  s <- o_clr_tax_guild$Species[i]
+  g <- o_clr_tax_guild$Genus[i]
+  f <- o_clr_tax_guild$Family[i]
+  o <- o_clr_tax_guild$Order[i]
+  c <- o_clr_tax_guild$Class[i]
+  p <- o_clr_tax_guild$Phylum[i]
+  k <- o_clr_tax_guild$Kingdom[i]
+  if(s %in% species_groups$Taxon){
+    o_clr_tax_guild$guild[i] <- species_groups$Classification[which(species_groups$Taxon == s)]
+  } else if(g %in% genus_groups$Taxon){
+    o_clr_tax_guild$guild[i] <- genus_groups$Classification[which(genus_groups$Taxon == g)]
+  } else if(f %in% family_groups$Taxon){
+    o_clr_tax_guild$guild[i] <- family_groups$Classification[which(family_groups$Taxon == f)]
+  } else if(o %in% order_groups$Taxon){
+    o_clr_tax_guild$guild[i] <- order_groups$Classification[which(order_groups$Taxon == o)]
+  } else if(c %in% class_groups$Taxon){
+    o_clr_tax_guild$guild[i] <- class_groups$Classification[which(class_groups$Taxon == c)]
+  } else if(p %in% phylum_groups$Taxon){
+    o_clr_tax_guild$guild[i] <- phylum_groups$Classification[which(phylum_groups$Taxon == p)]
+  } else if(k == "d__Archaea"){
+    o_clr_tax_guild$guild[i] <- "Archaea"
+  }
+}
+
+write.csv(leaf_rare_tax_guild_100, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rare_wtax_guild_100.csv")
+write.csv(leaf_rare_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rare_wtax_guild_200.csv")
+write.csv(leaf_rare_tax_guild_300, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/leaf_16s_asv_rare_wtax_guild_300.csv")
+write.csv(root_rare_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/root_16s_asv_rare_wtax_guild.csv")
+write.csv(m_rare_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/m_16s_asv_rare_wtax_guild.csv")
+write.csv(o_rare_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/Rarefaction/16S/o_16s_asv_rare_wtax_guild.csv")
+write.csv(leaf_clr_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/leaf_16s_asv_clr_wtax_guild.csv")
+write.csv(root_clr_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/root_16s_asv_clr_wtax_guild.csv")
+write.csv(m_clr_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/m_16s_asv_clr_wtax_guild.csv")
+write.csv(o_clr_tax_guild, "/projectnb/talbot-lab-data/Katies_data/Street_Trees/Analysis/Data_Cleaning/CLR/16S/o_16s_asv_clr_wtax_guild.csv")
+```
