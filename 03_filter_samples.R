@@ -9,7 +9,7 @@ library(vegan)
 ### SCRIPT SETUP ##############################################################
 date <- format(Sys.Date(),"_%Y%m%d")
 pwd <- "/projectnb/talbot-lab-data/Katies_data/Street_Trees_Dysbiosis/"
-amplicon <- "16S" # options: 16S or ITS
+amplicon <- "ITS" # options: 16S or ITS
 yourname <- "atherton" # user's last name for file storage purposes
 edit_metadata <- "N" # options: Y or N
 
@@ -104,7 +104,7 @@ write.csv(otu_table(ps_leaf), paste0(yourname, "_", amplicon,
                                      "_leaf_ASV_table_filteredsamples", date,
                                      ".csv"))
 saveRDS(ps_leaf, paste0(yourname, "_", amplicon, 
-                        "leaf_phyloseq_filteredsamples", date, ".RDS"))
+                        "_leaf_phyloseq_filteredsamples", date, ".RDS"))
 
 ### ROOT SAMPLES ##############################################################
 setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
@@ -159,7 +159,7 @@ write.csv(otu_table(ps_root), paste0(yourname, "_", amplicon,
                                      "_root_ASV_table_filteredsamples", date,
                                      ".csv"))
 saveRDS(ps_root, paste0(yourname, "_", amplicon, 
-                        "root_phyloseq_filteredsamples", date, ".RDS"))
+                        "_root_phyloseq_filteredsamples", date, ".RDS"))
 
 ### MSOIL SAMPLES #############################################################
 setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
@@ -203,7 +203,7 @@ write.csv(otu_table(ps_msoil), paste0(yourname, "_", amplicon,
                                       "_msoil_ASV_table_filteredsamples", date,
                                       ".csv"))
 saveRDS(ps_msoil, paste0(yourname, "_", amplicon,
-                         "msoil_phyloseq_filteredsamples", date, ".RDS"))
+                         "_msoil_phyloseq_filteredsamples", date, ".RDS"))
 
 ### OSOIL SAMPLES #############################################################
 setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
@@ -250,7 +250,7 @@ write.csv(otu_table(ps_osoil), paste0(yourname, "_", amplicon,
                                       "_osoil_ASV_table_filteredsamples", date,
                                       ".csv"))
 saveRDS(ps_osoil, paste0(yourname, "_", amplicon, 
-                         "osoil_phyloseq_filteredsamples", date, ".RDS"))
+                         "_osoil_phyloseq_filteredsamples", date, ".RDS"))
 
 ### WRITE TO METADATA WHETHER SAMPLES WERE DROPPED OR NOT #####################
 if(edit_metadata == "Y"){

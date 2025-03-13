@@ -251,7 +251,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
                              by_species, by_site, nrow = 2, ncol = 3)
   
   ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
-                "_NMDS_drop", threshold,"_", date, ".png"), multipanel, 
+                "_NMDS_drop", threshold, date, ".png"), multipanel, 
          width = 21, height = 10, units = "in", dpi = 300)
   
 }
