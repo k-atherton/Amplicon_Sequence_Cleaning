@@ -1,5 +1,0 @@
-export demux_artifact=/projectnb/talbot-lab-data/Katies_data/Street_Trees/dada2_output/ITS_Run1/intermediate/ITS_Run1_raw.qza
-export trim_output=/projectnb/talbot-lab-data/Katies_data/Street_Trees/dada2_output/ITS_Run1/intermediate/ITS_Run1_trimmed.qza
-export dada2_output=/projectnb/talbot-lab-data/Katies_data/Street_Trees/dada2_output/ITS_Run1/intermediate/dada2
-export vsearch_output=/projectnb/talbot-lab-data/Katies_data/Street_Trees/dada2_output/ITS_Run1/intermediate/vsearch
-export classification_output=/projectnb/talbot-lab-data/Katies_data/Street_Trees/dada2_output/ITS_Run1/intermediate/ITS_Run1_SILVA99.qza
