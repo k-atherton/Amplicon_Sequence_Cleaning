@@ -1,62 +1,84 @@
 ### LOAD IN PACKAGES ##########################################################
+print("LOADING IN PACKAGES:")
+library(optparse)
 library(vroom)
 library(plyr)
 library(dplyr)
 library(phyloseq)
+library(readxl)
 
 ### SCRIPT SETUP ##############################################################
+print("SETTING UP SCRIPT:")
 date <- format(Sys.Date(),"_%Y%m%d")
-pwd <- "/projectnb/talbot-lab-data/Katies_data/Street_Trees_Dysbiosis/"
-amplicon <- "16S" # options: 16S or ITS
-yourname <- "atherton" # user's last name for file storage purposes
-edit_metadata <- "N" # options: Y or N
+
+option_list = list(
+  make_option(c("-a", "--amplicon"), type="character", default="16S", 
+              help="amplicon dataset to filter; options: 16S or ITS [default= %default]", 
+              metavar="character"),
+  make_option(c("-n", "--name"), type="character", default="atherton", 
+              help="last name for output file naming scheme [default= %default]", 
+              metavar="character"),
+  make_option(c("-e", "--edit"), type="character", default="N", 
+              help="do you want to edit the metadata file? options: Y or N [default= %default]", 
+              metavar="character"),
+  make_option(c("-p", "--pwd"), type="character", default=getwd(),
+              help="the directory for saving the outputs of this script [default= %default]",
+              metavar="character"),
+  make_option(c("-v", "--asvtable"), type="character", default=NA,
+              help="file with paths to ASV tables output by DADA2",
+              metavar="character"),
+  make_option(c("-t", "--taxonomy"), type="character", default=NA,
+              help="file with paths to taxonomy tables output by DADA2",
+              metavar="character"),
+  make_option(c("-m", "--metadata"), type="character", default=NA,
+              help="path to sample metadata file", metavar="character"),
+  make_option(c("-c", "-negcontrols"), type="character", default=NA,
+              help="path to negative controls naming scheme file", 
+              metavar = "character")
+)
+
+opt_parser = OptionParser(option_list=option_list)
+opt = parse_args(opt_parser)
+
+amplicon <- opt$amplicon
+yourname <- opt$name
+edit_metadata <- opt$edit
+pwd <- opt$pwd
+script_dir <- getwd()
+
+if (!is.na(opt$asvtable)) {
+  asv_table_paths <- opt$asvtable
+} else {
+  stop("File with ASV table paths must be provided. See script usage (--help)")
+}
+if (!is.na(opt$taxonomy)) {
+  taxonomy_paths <- opt$taxonomy
+} else {
+  stop("File with taxonomy table paths must be provided. See script usage (--help)")
+}
+if (!is.na(opt$metadata)) {
+  metadata_path <- opt$metadata
+} else {
+  stop("Path to metadata file must be provided. See script usage (--help)")
+}
+if (!is.na(opt$negcontrols)) {
+  negcontrols_path <- opt$negcontrols
+} else {
+  stop("Path to metadata file must be provided. See script usage (--help)")
+}
 
 setwd(pwd)
 source("00_functions.R")
-setwd("02_Clean_Data")
+ensure_directory_exists(paste0(pwd,"02_Clean_Data"))
+setwd(paste0(pwd, "02_Clean_Data"))
 
 ### READ IN AND FORMAT ASV TABLES #############################################
+print("READING IN AND FORMATTING ASV TABLES:")
 # load sequencing data
-nr1 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_NR1/"), 
-                               paste0("atherton_NR1_", amplicon, 
-                                      "_ASV_table_"), ".tsv")
-nr2 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_NR2/"), 
-                               paste0("atherton_NR2_", amplicon, 
-                                      "_ASV_table_"), ".tsv")
-r1 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_Run1/"), 
-                              paste0("atherton_Run1_", amplicon, 
-                                     "_ASV_table_"), ".tsv")
-r2 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_Run2/"), 
-                              paste0("atherton_Run2_", amplicon, 
-                                     "_ASV_table_"), ".tsv")
-r3 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_Run3/"), 
-                              paste0("atherton_Run3_", amplicon, 
-                                     "_ASV_table_"), ".tsv")
-r4 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_Run4/"), 
-                              paste0("atherton_Run4_", amplicon, 
-                                     "_ASV_table_"), ".tsv")
-r5 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_Run5/"), 
-                              paste0("atherton_Run5_", amplicon, 
-                                     "_ASV_table_"), ".tsv")
-r6 <- read_in_dada2_asv_table(paste0("01_DADA2/", amplicon, "_Run6/"), 
-                              paste0("atherton_Run6_", amplicon, 
-                                     "_ASV_table_"), ".tsv")
-if(amplicon == "16S"){
-  rerun <- read_in_dada2_asv_table("01_DADA2/16S_ReRun/", 
-                                   "atherton_ReRun_16S_ASV_table_", 
-                                   ".tsv") 
-}
+asv_tables <- load_files(asv_table_paths)
 
 # create dataframe of all sequence data together
-if(amplicon == "16S"){
-  data <- join_all(list(nr1, nr2, r1, r2, r3, r4, r5, r6, rerun), 
-                   by = "ASV", type = "full")
-  rm(list = c('nr1', 'nr2', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6', 'rerun')) 
-} else{
-  data <- join_all(list(nr1 ,nr2, r1, r2, r3, r4, r5, r6), by = "ASV", 
-                   type = "full")
-  rm(list = c('nr1', 'nr2', 'r1', 'r2', 'r3', 'r4', 'r5', 'r6'))
-}
+data <- join_all(asv_tables, by = "ASV", type = "full")
 
 # change NA to 0 in sequence data
 data[is.na(data)] <- 0
@@ -66,52 +88,12 @@ rownames(data) <- data$ASV
 data <- data[,-1]
 
 ### READ IN AND FORMAT TAXONOMY TABLES ########################################
+print("READING IN AND FORMATTING TAXONOMY TABLES:")
 # load taxonomic data
-tax_nr1 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_NR1/"), 
-                                  paste0("atherton_NR1_", amplicon, 
-                                         "_taxonomy_"), ".tsv")
-tax_nr2 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_NR2/"), 
-                                  paste0("atherton_NR2_", amplicon, 
-                                         "_taxonomy_"), ".tsv")
-tax_r1 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_Run1/"), 
-                                 paste0("atherton_Run1_", amplicon, 
-                                        "_taxonomy_"), ".tsv")
-tax_r2 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_Run2/"), 
-                                 paste0("atherton_Run2_", amplicon, 
-                                        "_taxonomy_"), ".tsv")
-tax_r3 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_Run3/"), 
-                                 paste0("atherton_Run3_", amplicon, 
-                                        "_taxonomy_"), ".tsv")
-tax_r4 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_Run4/"), 
-                                 paste0("atherton_Run4_", amplicon, 
-                                        "_taxonomy_"), ".tsv")
-tax_r5 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_Run5/"), 
-                                 paste0("atherton_Run5_", amplicon, 
-                                        "_taxonomy_"), ".tsv")
-tax_r6 <- read_in_dada2_taxonomy(paste0("01_DADA2/", amplicon, "_Run6/"), 
-                                 paste0("atherton_Run6_", amplicon, 
-                                        "_taxonomy_"), ".tsv")
-if(amplicon == "16S"){
-  tax_rerun <- read_in_dada2_taxonomy("01_DADA2/16S_ReRun/", 
-                                      "atherton_ReRun_16S_taxonomy_", 
-                                      ".tsv")
-}
-
+taxonomy_tables <- load_files(taxonomy_paths)
 
 # create dataframe of all taxonomy information together
-if(amplicon == "16S"){
-  tax <- join_all(list(tax_nr1, tax_nr2, tax_r1, tax_r2, tax_r3, tax_r4, 
-                       tax_r5, tax_r6, tax_rerun), 
-                  by = c("Feature ID", "Taxon"), type = "full")
-  rm(list = c('tax_nr1', 'tax_nr2', 'tax_r1', 'tax_r2', 'tax_r3', 'tax_r4',
-              'tax_r5', 'tax_r6','tax_rerun')) 
-} else{
-  tax <- join_all(list(tax_nr1, tax_nr2, tax_r1, tax_r2, tax_r3, tax_r4, 
-                       tax_r5, tax_r6), 
-                  by = c("Feature ID", "Taxon"), type = "full")
-  rm(list = c('tax_nr1', 'tax_nr2', 'tax_r1', 'tax_r2', 'tax_r3', 'tax_r4', 
-              'tax_r5', 'tax_r6'))
-}
+tax <- join_all(taxonomy_tables, by = c("Feature ID", "Taxon"), type = "full")
 
 # separate the taxonomy information into ranks
 names <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", 
@@ -135,25 +117,37 @@ rownames(tax) <- tax[,1]
 tax <- tax[,-1]
 rm(list = c('names','split_taxa','taxa_names','tax_table'))
 
+# add functional guild to taxonomy
+if(amplicon == "16S"){
+  functional_guilds <- read_in_file(script_dir, 
+                                    "werbin_bacteria_functional_groups", ".csv")
+  tax <- add_16s_guild(tax, functional_guilds)
+} else{
+  functional_guilds <- read_excel(paste0(script_dir, 
+                                         "fungal_traits_database.xlsx"))
+  tax <- add_its_guild(tax, functional_guilds)
+}
+
 # write files to csv
-write.csv(data, paste0("02_DADA2_ASV_Tables/", amplicon, "/", yourname,
-                       "_", amplicon, "_ASV_table_allsampletypes_raw",
+ensure_directory_exists(paste0(pwd,"02_Clean_Data/02_DADA2_ASV_Tables"))
+ensure_directory_exists(paste0(pwd,"02_Clean_Data/02_DADA2_ASV_Tables/", 
+                               amplicon))
+setwd(paste0(pwd, "02_Clean_Data/02_DADA2_ASV_Tables/", amplicon))
+write.csv(data, paste0(yourname, "_", amplicon, "_ASV_table_allsampletypes_raw",
                        date,".csv"))
-write.csv(tax,paste0("02_DADA2_ASV_Tables/", amplicon, "/", yourname,
-                     "_", amplicon, "_taxonomy_allsampletypes_raw",
+write.csv(tax,paste0(yourname, "_", amplicon, "_taxonomy_allsampletypes_raw",
                      date,".csv"))
 
 ### READ IN SAMPLE METADATA ###################################################
+print("READING IN SAMPLE METADATA:")
+ensure_directory_exists(paste0(pwd,"01_Collect_Data/01_Sample_Metadata/"))
 setwd(paste0(pwd,"01_Collect_Data/01_Sample_Metadata"))
 # record raw dada2 read counts in metadata table
-if(amplicon == "16S"){
-  metadata <- read_in_file(getwd(), "atherton_sample_metadata_16S_", ".csv") 
-} else{
-  metadata <- read_in_file(getwd(), "atherton_sample_metadata_ITS_", ".csv") 
-}
+metadata <- read.csv(metadata_path)
 
 if(edit_metadata %in% c("Y", "y")){
   ### EDIT SAMPLE METADATA FILE ###############################################
+  print("EDITING SAMPLE METADATA FILE:")
   # add is.control column
   metadata$is_control <- FALSE
   # record negatvie controls as controls in is.control column
@@ -177,15 +171,16 @@ if(edit_metadata %in% c("Y", "y")){
 }
 
 ### SEPARATE ASV TABLE BY SAMPLE TYPE #########################################
+print("SEPARATING ASV TABLE BY SAMPLE TYPE:")
 setwd(paste0(pwd,"02_Clean_Data/02_DADA2_ASV_Tables/", amplicon))
-
-# make phyloseq objects
-if(amplicon == "ITS"){
-  colnames(data) <- gsub("neg_control_1.1", "neg_control_1-1", 
-                         colnames(data))
-  colnames(data) <- gsub("neg_control_1.2", "neg_control_1-2", 
-                         colnames(data))
-}
+# 
+# # make phyloseq objects
+# if(amplicon == "ITS"){
+#   colnames(data) <- gsub("neg_control_1.1", "neg_control_1-1", 
+#                          colnames(data))
+#   colnames(data) <- gsub("neg_control_1.2", "neg_control_1-2", 
+#                          colnames(data))
+# }
 tax <- tax_table(as.matrix(tax))
 data <- otu_table(as.matrix(data), taxa_are_rows = TRUE)
 
@@ -200,47 +195,22 @@ meta <- sample_data(meta)
 
 ps_meta <- merge_phyloseq(ps, meta)
 
+negative_control_names <- read.csv(negcontrols_path)
+
 # make leaf dataset
-if(amplicon == "16S"){
-  leaf_ncs <- c("neg_control_1_16S", "neg_control_2_16S", "leaf_1", 
-                "leaf_2", "leaf_3", "leaf_4", "leaf_5", "leaf_6") 
-} else{
-  leaf_ncs <- c("neg_control_1-1_ITS", "neg_control_1-2_ITS",
-                "neg_control_2_ITS", "leaf_2", "leaf_3", "leaf_4", 
-                "leaf_5", "leaf_6")
-}
+leaf_ncs <- negative_control_names[which(negative_control_names$sample_type == "leaf"),]
 ps_leaf_w_nc <- subset_phyloseq(data, ps_meta, "Leaf", leaf_ncs)
 
 # make root dataset
-root_ncs <- c("1_root", "2_root", "root_1", "root_2", "root_3", "root_4", 
-              "root_5", "root_6")
+root_ncs <- negative_control_names[which(negative_control_names$sample_type == "root"),]
 ps_root_w_nc <- subset_phyloseq(data, ps_meta, "Root", root_ncs)
 
 # make M soil dataset
-if(amplicon == "16S"){
-  msoil_ncs <- c("neg_control_1_16S", "neg_control_2_16S", 
-                 "neg_control_M_1", "neg_control_M_2", "neg_control_M_3", 
-                 "neg_control_M_4", "neg_control_M_5", "neg_control_M_6")
-} else{
-  msoil_ncs <- c("neg_control_1-1_ITS", "neg_control_1-2_ITS", 
-                 "neg_control_2_ITS", "neg_control_M_1", "neg_control_M_2", 
-                 "neg_control_M_3", "neg_control_M_4", "neg_control_M_5", 
-                 "neg_control_M_6")
-}
+msoil_ncs <- negative_control_names[which(negative_control_names$sample_type == "msoil"),]
 ps_msoil_w_nc <- subset_phyloseq(data, ps_meta, "MSoil", msoil_ncs)
 
 # make O soil dataset
-if(amplicon == "16S"){
-  osoil_ncs <- c("neg_control_1_soil", "neg_control_2_soil", 
-                 "neg_control_O_1", "neg_control_O_2", "neg_control_O_3", 
-                 "neg_control_O_4", "neg_control_O_5", "neg_control_O_6", 
-                 "neg_control_o_rerun1_1", "neg_control_o_rerun1_2", 
-                 "neg_control_o_rerun2_1", "neg_control_o_rerun2_2")
-} else{
-  osoil_ncs <- c("neg_control_1_soil", "neg_control_2_soil", 
-                 "neg_control_O_1", "neg_control_O_2", "neg_control_O_3", 
-                 "neg_control_O_4", "neg_control_O_5", "neg_control_O_6")
-}
+osoil_ncs <- negative_control_names[which(negative_control_names$sample_type == "osoil"),]
 ps_osoil_w_nc <- subset_phyloseq(data, ps_meta, "OSoil", osoil_ncs)
 
 # save as data frames
