@@ -195,61 +195,26 @@ meta <- sample_data(meta)
 
 ps_meta <- merge_phyloseq(ps, meta)
 
+print("Getting negative control names.")
 negative_control_names <- read.csv(negcontrols_path)
+sample_types <- unique(negative_control_names$sample_type)
 
-# make leaf dataset
-leaf_ncs <- negative_control_names[which(negative_control_names$sample_type == "leaf"),]
-ps_leaf_w_nc <- subset_phyloseq(data, ps_meta, "Leaf", leaf_ncs)
-
-# make root dataset
-root_ncs <- negative_control_names[which(negative_control_names$sample_type == "root"),]
-ps_root_w_nc <- subset_phyloseq(data, ps_meta, "Root", root_ncs)
-
-# make M soil dataset
-msoil_ncs <- negative_control_names[which(negative_control_names$sample_type == "msoil"),]
-ps_msoil_w_nc <- subset_phyloseq(data, ps_meta, "MSoil", msoil_ncs)
-
-# make O soil dataset
-osoil_ncs <- negative_control_names[which(negative_control_names$sample_type == "osoil"),]
-ps_osoil_w_nc <- subset_phyloseq(data, ps_meta, "OSoil", osoil_ncs)
-
-# save as data frames
-leaf_raw <- as.data.frame(as.matrix(ps_leaf_w_nc@otu_table))
-leaf_raw_tax <- as.data.frame(as.matrix(ps_leaf_w_nc@tax_table))
-root_raw <- as.data.frame(as.matrix(ps_root_w_nc@otu_table))
-root_raw_tax <- as.data.frame(as.matrix(ps_root_w_nc@tax_table))
-msoil_raw <- as.data.frame(as.matrix(ps_msoil_w_nc@otu_table))
-msoil_raw_tax <- as.data.frame(as.matrix(ps_msoil_w_nc@tax_table))
-osoil_raw <- as.data.frame(as.matrix(ps_osoil_w_nc@otu_table))
-osoil_raw_tax <- as.data.frame(as.matrix(ps_osoil_w_nc@tax_table))
-
-# write to SCC
-write.csv(leaf_raw, paste0(getwd(), "/", yourname, "_", amplicon, 
-                           "_ASV_table_leaf_raw", date, ".csv"))
-write.csv(root_raw, paste0(getwd(), "/", yourname, "_", amplicon, 
-                           "_ASV_table_root_raw", date, ".csv"))
-write.csv(msoil_raw, paste0(getwd(), "/", yourname, "_", amplicon, 
-                            "_ASV_table_msoil_raw", date, ".csv"))
-write.csv(osoil_raw, paste0(getwd(), "/", yourname, "_", amplicon, 
-                            "_ASV_table_osoil_raw", date, ".csv"))
-write.csv(leaf_raw_tax, paste0(getwd(), "/", yourname, "_", amplicon, 
-                               "_taxonomy_leaf_raw", date, ".csv"))
-write.csv(root_raw_tax, paste0(getwd(), "/", yourname, "_", amplicon, 
-                               "_taxonomy_root_raw", date, ".csv"))
-write.csv(msoil_raw_tax, paste0(getwd(), "/", yourname, "_", amplicon, 
-                                "_taxonomy_msoil_raw", date, ".csv"))
-write.csv(osoil_raw_tax, paste0(getwd(), "/", yourname, "_", amplicon, 
-                                "_taxonomy_osoil_raw", date, ".csv"))
-
-saveRDS(ps_leaf_w_nc, paste0(getwd(), "/", yourname, "_", amplicon, 
-                             "_phyloseq_leaf_raw_withnegcontrols", date, 
-                             ".RDS"))
-saveRDS(ps_root_w_nc, paste0(getwd(), "/", yourname, "_", amplicon, 
-                             "_phyloseq_root_raw_withnegcontrols", date, 
-                             ".RDS"))
-saveRDS(ps_msoil_w_nc, paste0(getwd(), "/", yourname, "_", amplicon, 
-                              "_phyloseq_msoil_raw_withnegcontrols", date, 
-                              ".RDS"))
-saveRDS(ps_osoil_w_nc, paste0(getwd(), "/", yourname, "_", amplicon, 
-                              "_phyloseq_osoil_raw_withnegcontrols", date, 
-                              ".RDS"))
+for(i in 1:length(sample_types)){
+  type <- sample_types[i]
+  print(paste0("Working with ", type, " samples."))
+  print("Getting negative controls and merging with samples.")
+  ncs <- negative_control_names[which(negative_control_names$sample_type == type),]
+  ps_w_nc <- subset_phyloseq(data, ps_meta, type, ncs)
+  
+  print("Making raw data tables.")
+  raw <- as.data.frame(as.matrix(ps_w_nc@otu_table))
+  raw_tax <- as.data.frame(as.matrix(ps_w_nc@tax_table))
+  
+  print("Writing to files.")
+  write.csv(raw, paste0(getwd(), "/", yourname, "_", amplicon, "_ASV_table_", 
+                        type, "_raw", date, ".csv"))
+  write.csv(raw_tax, paste0(getwd(), "/", yourname, "_", amplicon, "_taxonomy_", 
+                            type, "_raw", date, ".csv"))
+  saveRDS(ps_w_nc, paste0(getwd(), "/", yourname, "_", amplicon, "_phyloseq_", 
+                          type, "raw_withnegcontrols", date, ".RDS"))
+}
