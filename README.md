@@ -41,7 +41,9 @@ See `01_DADA2/00_how_to_run_dada2.txt` for more information on how to use the ex
   - Should the metadata file be edited? (flag: -e or --edit): do you want to add the DADA2 sequence count to the metadata file? options: Y or N [default = N]
   - Working directory (flag: -p or --pwd): Directory for saving the outputs of the script [default is the result of the function getwd() in R]
   - File with paths to ASV tables output by DADA2 (flag: -v or --asvtable): the file should be a .txt where each line is the full path to each DADA2 output ASV table. See `example_asv_table_paths_file.txt`
+    - **Make this file yourself, but the file should point to the ASV tables created by BU16S in Step 1!**
   - File with paths to taxonomy tables output by DADA2 (flag: -t or --taxonomy): the file should be a .txt where each line is the full path to each DADA2 output taxonomy table. See `example_taxonomy_paths_file.txt`
+    - **Make this file yourself, but the file should point to the taxonomy tables created by BU16S in Step 1!**
   - Metadata file (flag: -m or --metadata): the file should be a .csv and have a column name called sample_type, which defines the sample types (e.g. "leaf", "negative control", "soil", etc.).
   - File with negative control naming patterns, matched to the sample types that the negative controls were amplified and sequenced with (flag: -c or --negcontrols): the file should be a .csv and have a column called sample_type with the sample type that matches the sample_type names in the metadata file and another column called negative_control_name_pattern that contains strings that define the naming patterns of the negative controls. You can use the whole negative control sample names, or just a pattern that will allow a function like grep to find the negative control samples. See `example_negative_control_name_file.csv`
   - Script directory (flag: -s or --scriptdir): path to the function script directory where the 00_functions.R script is held
@@ -50,4 +52,4 @@ See `01_DADA2/00_how_to_run_dada2.txt` for more information on how to use the ex
   - Raw (i.e. not filtered) formatted taxonomy tables: for all sample types and one for each individual sample type. Saved as .csv
   - Raw (i.e. not filtered) phyloseq objects: one for each individual sample type. The phyloseq objects contain the ASV table, taxonomy, and metadata for each sample. Saved as .RDS                          
 
-To run this script, adjust the inputs for each respective flag within the script and then run qsub -P <SCC project name> -N <job name> 02_run_format_raw_dada2_asv_tables.sh>
+To run this script, adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 02_run_format_raw_dada2_asv_tables.sh>`
