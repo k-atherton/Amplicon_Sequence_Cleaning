@@ -1,0 +1,9 @@
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_NR1/atherton_NR1_16S_taxonomy_20240328.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_NR2/atherton_NR2_16S_taxonomy_20240111.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_Run1/atherton_Run1_16S_taxonomy_20240329.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_Run2/atherton_Run2_16S_taxonomy_20240329.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_Run3/atherton_Run3_16S_taxonomy_20240328.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_Run4/atherton_Run4_16S_taxonomy_20240328.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_Run5/atherton_Run5_16S_taxonomy_20240328.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_Run6/atherton_Run6_16S_taxonomy_20240328.tsv
+/projectnb/talbot-lab-data/Katies_data/M-BUDS/02_Clean_Data/01_DADA2/16S_ReRun/atherton_ReRun_16S_taxonomy_20240924.tsv

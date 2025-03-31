@@ -1,0 +1,76 @@
+For my research, I performed sequence QC and taxonomic assignment with the BU16S pipeline 
+developed by Dr. Michael Silverstein. See here for more information: 
+https://github.com/Boston-University-Microbiome-Initiative/BU16s
+
+I've created an example input script for you to copy, called 01_bu16s_example_inputs.sh. 
+
+I recommend following this workflow for using BU16S:
+1. Create a directory for each sequencing run you need to process. For example, I had six 
+	sequencing runs, and for each run I needed to process both 16S and ITS sequences, so 
+	I had a directories called Run1_16S, Run1_ITS, Run2_16S, Run2_ITS, etc. To create the
+	directories, run the command "mkdir <directory name>" in the command line for each 
+	directory you want to make. Make sure the directory name has no spaces. 
+2. Copy my example input script (01_bu16s_example_inputs.sh) into each directory with the
+	command "cp 01_bu16s_example_inputs.sh <directory name>/<file_name>". A good file name
+	would include the sequencing run name and the amplicon sequence information, as well
+	as "bu16s_inputs" (e.g. run1_16s_bu16s_inputs.sh).
+3. Edit the input script for each sequencing run. Here are the edits you NEED to make:
+	a. PROJECTNAME=<name_of_DADA2_run>
+		I would name this something with your project ID and your sequencing run name
+		(e.g. street_trees_run1_16s). Make sure there are no spaces in the name. 
+	b. INPUTDIR=<path_to_input_directory>
+		This is where your sequences are stored. If your sequences are not stored in the 
+		directory where this script is, be sure to include the entire path, starting with 
+		"/projectnb/".
+	There might be other edits you should make to the script:
+	a. OUTPUTDIR=$(pwd)
+		Currently, this is set up so that the DADA2 outputs are stored in the directory 
+		you just created and copied the input script into. If you want to store it 
+		elsewhere, change this to the path to that directory. Be sure to include the 
+		entire path, starting with "/projectnb/".
+	b. INTERMEDIATEDIR=$(pwd)/intermediate
+		Again, this is set up so that the intermediate directory is inside the directory
+		you just created and copied the input script into. Change as above, including the 
+		"/intermediate" part of the path in your path. 
+	c. RUNPARAMETERS=$(pwd)/.runparams
+		See b.
+	d. FWD_FMT=_L001_R1_001.fastq.gz
+		This is the format that Tufts uses. If you sequenced your amplicons with a 
+		different facility, check what their forward read file naming format is and change
+		it here. 
+	e. REV_FMT=_L001_R2_001.fastq.gz
+		Same as d. 
+	f. FWD_PRIMER=
+		When working with Tufts, they removed my primers from my sequences, so I left this
+		field blank. If your sequencing facility does not remove your primers when they 
+		process your sequences, add the primer sequence here. 
+	g. REV_PRIMER=
+		Same as g.
+	h. SILVA_SEQUENCES=/projectnb/microbiome/ref_db/silva_132_99_16S.qza
+		This is the default version of the SILVA database that the BU16S pipeline uses. If 
+		you want to point to the UNITE v.9 (fungal) database instead, change this path to 
+		/projectnb/microbiome/ref_db/UNITE/sh_refs_qiime_ver9_dynamic_25.07.2023.qza
+		I downloaded a more recent version of the SILVA database (version 138.1)) and 
+		saved it to the SCC (if you are in the Bhatnagar Lab, see my 
+		Katies_data/Databases/ directory, and feel free to point to them here; otherwise, 
+		download the SILVA database here: https://www.arb-silva.de/download/archive/ and 
+		the UNITE database here: https://unite.ut.ee/repository.php)
+	i. SILVA_TAXONOMY=/projectnb/microbiome/ref_db/silva_132_99_majority_taxonomy.qza
+		Same as h. To point to the UNITE v.9 database instead, change this path to 
+		/projectnb/microbiome/ref_db/UNITE/sh_taxonomy_qiime_ver9_dynamic_25.07.2023.qza
+		If you need to download a more recent version of either database, the taxonomy 
+		file will be zipped with the reference sequences file. 
+	More advanced changes you might need to make:
+	a. DADA2_ARGS=""
+		If you are having issues with matching forward and reverse reads, you might need 
+		to dig into the DADA2 documentation to tune the parameters. See more about that in
+		Dr. Silverstein's documentation and the DADA2 documentation: 
+		https://benjjneb.github.io/dada2/
+	b. PAIRED=True
+		If you are having issues with matching forward and reverse reads, specifically 
+		with reverse read quality, you might want to try running this pipeline on only the
+		forward reads. If that is the case, change this parameter to "False" and change 
+		the REV_FMT= parameter to "None" (don't include the quotes).
+4. After adjusting your script, you are ready to run it! First, load the BU16S module with
+	the command "module load bu16s". Then run the script with the following command:
+	qsub -P <SCC project name> -N <Job name> $SCC_BU16S_DIR/bu16s.qsub <inputs_file_name>.sh
