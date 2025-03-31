@@ -31,7 +31,7 @@ To run this pipeline, you will need the following R packages:
   - Taxonomy table: matches ASV ID to taxonomic information
   - Other intermediate files, including representative sequences file (see BU16S documentation for more information)
 
-See `01_DADA2/00_how_to_run_dada2.txt` for more information on how to use the example inputs script to run BU16S. If you are working on the BU SCC, you will need to load the BU16S module (module load bu16s) and then run the script with the following command: `qsub -P <SCC project name> -N <job name> $SCC_BU16S_DIR/bu16s.qsub <inputs file name>.sh`
+See `01_DADA2/00_how_to_run_dada2.txt` for more information on how to use the example inputs script to run BU16S. If you are working on the BU SCC, you will need to load the BU16S module (`module load bu16s`) and then run the script with the following command: `qsub -P <SCC project name> -N <job name> $SCC_BU16S_DIR/bu16s.qsub <inputs file name>.sh`
 
 ## Step 2: Format Raw DADA2 ASV tables
 **Filename: `02_Format_Raw_DADA2_ASV_Tables/02_run_format_raw_dada2_asv_tables.sh`**
