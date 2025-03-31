@@ -22,7 +22,7 @@ To run this pipeline, you will need the following R packages:
   - project name + run ID (example: M-BUDS_Run1)
   - path to directory where the sequencing run fastq files are
   - output directory where results should be saved [default is the present working directory]
-  - file naming format of the forward/reverse read files (example: Tufts names the forward file `\_L001\_R1\_001.fastq.gz` and the reverse file `\_L001\_R2\_001.fastq.gz`)
+  - file naming format of the forward/reverse read files (example: Tufts names the forward file `_L001_R1_001.fastq.gz` and the reverse file `_L001_R2_001.fastq.gz`)
   - forward and reverse primer sequences (leave blank if primers were removed by sequencing facility)
   - path to taxonomic annotation database (defaults to BU Microbiome Initiative SILVA version 132)
   - advanced DADA2 parameters, if necessary (i.e. primer end, truncation length, cutadapt arguments, paired sequencing, etc).
