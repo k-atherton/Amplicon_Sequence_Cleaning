@@ -10,7 +10,8 @@ ensure_directory_exists <- function(folder_path) {
 process_file <- function(file_path) {
   print(paste0("Reading in file: ", file_path))
   if (grepl("\\.tsv$", file_path, ignore.case = TRUE)) {
-    return(read.table(file_path, sep = "\t", header = TRUE, stringsAsFactors = FALSE))
+    return(read.table(file_path, sep = "\t", header = TRUE, 
+                      stringsAsFactors = FALSE, comment.char = ""))
   } else {
     warning(paste("Unsupported file type:", file_path))
     return(NULL)
@@ -246,15 +247,13 @@ add_its_guild <- function(tax, functional_guilds){
 
 subset_phyloseq <- function(ps_otu, ps_meta, type, nc_list){
   print(paste0("Subsetting ", type, " samples from the whole dataset."))
-  if(type == "Leaf"){
-    ps_subset <- subset_samples(ps_meta, sample_type == "Leaf") 
-  } else if(type == "Root"){
-    ps_subset <- subset_samples(ps_meta, sample_type == "Root") 
-  } else if(type == "MSoil"){
-    ps_subset <- subset_samples(ps_meta, (sample_type == "Soil") & (soil_horizon == "M"))
-  } else if(type == "OSoil"){
-    ps_subset <- subset_samples(ps_meta, (sample_type == "Soil") & (soil_horizon == "O"))
-  }
+  
+  # Extract the metadata as a dataframe
+  metadata <- ps_meta@sam_data
+  metadata <- metadata[which(metadata$sample_type == type),]
+  
+  # Subset samples
+  ps_subset <- prune_samples(rownames(metadata), ps_meta)
   
   # add negative controls
   print("Adding negative controls to the subsetted dataset.")

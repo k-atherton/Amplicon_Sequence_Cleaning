@@ -2,10 +2,11 @@
 print("LOADING IN PACKAGES:")
 library(optparse)
 library(vroom)
-library(plyr)
 library(dplyr)
 library(phyloseq)
 library(readxl)
+library(purrr)
+library(readr)
 
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
@@ -32,9 +33,13 @@ option_list = list(
               metavar="character"),
   make_option(c("-m", "--metadata"), type="character", default=NA,
               help="path to sample metadata file", metavar="character"),
-  make_option(c("-c", "-negcontrols"), type="character", default=NA,
+  make_option(c("-c", "--negcontrols"), type="character", default=NA,
               help="path to negative controls naming scheme file", 
-              metavar = "character")
+              metavar = "character"),
+  make_option(c("-s","--scriptdir"), type="character", 
+              default="/projectnb/talbot-lab-data/Katies_data/Amplicon_Sequence_Cleaning/",
+              help="path to function script directory, [default = %default]",
+              metavar="character")
 )
 
 opt_parser = OptionParser(option_list=option_list)
@@ -43,8 +48,12 @@ opt = parse_args(opt_parser)
 amplicon <- opt$amplicon
 yourname <- opt$name
 edit_metadata <- opt$edit
-pwd <- opt$pwd
-script_dir <- getwd()
+if(endsWith(opt$pwd, "/")){
+  pwd <- opt$pwd
+} else{
+  pwd <- paste0(opt$pwd, "/")
+}
+script_dir <- opt$scriptdir
 
 if (!is.na(opt$asvtable)) {
   asv_table_paths <- opt$asvtable
@@ -67,7 +76,7 @@ if (!is.na(opt$negcontrols)) {
   stop("Path to metadata file must be provided. See script usage (--help)")
 }
 
-setwd(pwd)
+setwd(script_dir)
 source("00_functions.R")
 ensure_directory_exists(paste0(pwd,"02_Clean_Data"))
 setwd(paste0(pwd, "02_Clean_Data"))
@@ -77,8 +86,13 @@ print("READING IN AND FORMATTING ASV TABLES:")
 # load sequencing data
 asv_tables <- load_files(asv_table_paths)
 
+# change first column to "ASV" for merging
+for(i in 1:length(asv_tables)){
+  colnames(asv_tables[[i]])[1] <- "ASV"  
+}
+
 # create dataframe of all sequence data together
-data <- join_all(asv_tables, by = "ASV", type = "full")
+data <- purrr::reduce(asv_tables, full_join, by = "ASV")
 
 # change NA to 0 in sequence data
 data[is.na(data)] <- 0
@@ -92,8 +106,13 @@ print("READING IN AND FORMATTING TAXONOMY TABLES:")
 # load taxonomic data
 taxonomy_tables <- load_files(taxonomy_paths)
 
+# keep only the taxonomic information
+for(i in 1:length(taxonomy_tables)){
+  taxonomy_tables[[i]] <- taxonomy_tables[[i]][,c(1,2)]
+}
+
 # create dataframe of all taxonomy information together
-tax <- join_all(taxonomy_tables, by = c("Feature ID", "Taxon"), type = "full")
+tax <- purrr::reduce(taxonomy_tables, full_join, by = c("Feature.ID", "Taxon"))
 
 # separate the taxonomy information into ranks
 names <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", 
@@ -115,16 +134,17 @@ tax <- tax[,-2]
 # make Feature ID the rownames, remove column
 rownames(tax) <- tax[,1]
 tax <- tax[,-1]
-rm(list = c('names','split_taxa','taxa_names','tax_table'))
+rm(list = c('asv_tables', 'taxonomy_tables', 'names','split_taxa','taxa_names',
+            'tax_table'))
 
 # add functional guild to taxonomy
 if(amplicon == "16S"){
-  functional_guilds <- read_in_file(script_dir, 
+  functional_guilds <- read_in_file(paste0(script_dir, "00_Databases/"), 
                                     "werbin_bacteria_functional_groups", ".csv")
   tax <- add_16s_guild(tax, functional_guilds)
 } else{
   functional_guilds <- read_excel(paste0(script_dir, 
-                                         "fungal_traits_database.xlsx"))
+                                         "00_Databases/fungal_traits_database.xlsx"))
   tax <- add_its_guild(tax, functional_guilds)
 }
 
@@ -141,9 +161,12 @@ write.csv(tax,paste0(yourname, "_", amplicon, "_taxonomy_allsampletypes_raw",
 ### READ IN SAMPLE METADATA ###################################################
 print("READING IN SAMPLE METADATA:")
 ensure_directory_exists(paste0(pwd,"01_Collect_Data/01_Sample_Metadata/"))
-setwd(paste0(pwd,"01_Collect_Data/01_Sample_Metadata"))
+setwd(paste0(pwd,"01_Collect_Data/01_Sample_Metadata/"))
 # record raw dada2 read counts in metadata table
-metadata <- read.csv(metadata_path)
+metadata <- read_csv(metadata_path)
+
+# remove samples not in metadata
+data <- data[ ,colnames(data) %in% metadata$sample_name]
 
 if(edit_metadata %in% c("Y", "y")){
   ### EDIT SAMPLE METADATA FILE ###############################################
@@ -158,6 +181,7 @@ if(edit_metadata %in% c("Y", "y")){
   dada2_seq_count <- colSums(data)
   
   # record sequence counts in metadata table
+  metadata$seq_count_dada2 <- NA
   for(i in 1:length(dada2_seq_count)){
     sample_name <- names(dada2_seq_count)[i]
     metadata$seq_count_dada2[which(metadata$sample_name == sample_name)] <- 
@@ -165,8 +189,8 @@ if(edit_metadata %in% c("Y", "y")){
   }
   
   # write this data to the file
-  write.csv(metadata, paste0(getwd(), yourname, "_sample_metadata_", 
-                             amplicon, date, ".csv"),
+  write.csv(metadata, paste0(getwd(), "/", yourname, "_", amplicon, 
+                             "_sample_metadata", date, ".csv"),
             row.names = FALSE)
 }
 
@@ -196,14 +220,14 @@ meta <- sample_data(meta)
 ps_meta <- merge_phyloseq(ps, meta)
 
 print("Getting negative control names.")
-negative_control_names <- read.csv(negcontrols_path)
+negative_control_names <- read_csv(negcontrols_path)
 sample_types <- unique(negative_control_names$sample_type)
 
 for(i in 1:length(sample_types)){
   type <- sample_types[i]
   print(paste0("Working with ", type, " samples."))
   print("Getting negative controls and merging with samples.")
-  ncs <- negative_control_names[which(negative_control_names$sample_type == type),]
+  ncs <- negative_control_names$negative_control_name_pattern[which(negative_control_names$sample_type == type)]
   ps_w_nc <- subset_phyloseq(data, ps_meta, type, ncs)
   
   print("Making raw data tables.")
