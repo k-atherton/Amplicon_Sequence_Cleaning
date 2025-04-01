@@ -321,7 +321,7 @@ id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type, yourname
                                            amplicon, date, rep){
   # make a transposed verison of the sequencing data
   print("Transposing the sequencing data:")
-  data_t <- as.data.frame(t(data))
+  data_t <- as.data.frame(t(otu_data))
   
   # calculate Aitchison distance for samples
   print("Calculating the Aitchison's distance for the samples")

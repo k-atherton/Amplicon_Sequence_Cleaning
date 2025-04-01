@@ -100,21 +100,22 @@ for(i in 1:length(types)){
   # filter outliers out of data and metadata
   ps_filtered <- prune_samples(!(sample_names(ps) %in% outliers), ps)
   sample_metadata <- as.data.frame(as.matrix(ps_filtered@sam_data))
+  sample_otu <- as.data.frame(otu_data(ps_filtered))
   
   print("Visualizing removal of outliers:")
   setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
                "/Figures"))
   # evaluate whether you have removed all outliers; re-run until you feel you have 
   # removed all outliers in the above lines
-  id_outliers_evaluate_seq_depth(ps_filtered, sample_metadata, types[i], yourname, 
+  id_outliers_evaluate_seq_depth(sample_otu, sample_metadata, types[i], yourname, 
                                  amplicon, date, "outliers_removed")
   
   print("Testing drop thresholds:")
   threshold1 <- thresholds$threshold1[which(thresholds$sample_type == types[i])]
   threshold2 <- thresholds$threshold2[which(thresholds$sample_type == types[i])]
-  test_drop_threshold(ps_filtered, sample_metadata, types[i], yourname, amplicon, 
+  test_drop_threshold(sample_otu, sample_metadata, types[i], yourname, amplicon, 
                       date, threshold1)
-  test_drop_threshold(ps_filtered, sample_metadata, types[i], yourname, amplicon, 
+  test_drop_threshold(sample_otu, sample_metadata, types[i], yourname, amplicon, 
                       date, threshold2)
 }
 
