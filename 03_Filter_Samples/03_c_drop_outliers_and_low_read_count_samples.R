@@ -93,7 +93,7 @@ print("Sample types:")
 types <- types[!grepl("Negative Control", types)]
 print(types)
 for(i in 1:length(types)){
-  print("Processing ", types[i], " samples")
+  print(paste0("Processing ", types[i], " samples"))
   
   setwd(paste0(pwd,"02_Clean_Data/02_DADA2_ASV_Tables/",amplicon))
   print("Reading in most recent version of phyloseq object:")
