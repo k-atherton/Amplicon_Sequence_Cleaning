@@ -35,7 +35,10 @@ option_list = list(
               metavar="threshold"),
   make_option(c("-o", "--outliers"), type="character", default=NA,
               help="text file with list of outlier samples to remove from any sample type",
-              metavar="outliers")
+              metavar="outliers"),
+  make_option(c("-v", "--variables"), type="character", default=NA, 
+              help="text file with list of varibles to color data by for NMDS plots",
+              metavar="variables")
 )
 
 opt_parser = OptionParser(option_list=option_list)
@@ -62,11 +65,20 @@ if (!is.na(opt$threshold)) {
 } else {
   stop("Path to threshold file must be provided. See script usage (--help)")
 }
-if (!is.na(opt$threshold)) {
+if (!is.na(opt$outliers)) {
   outliers_path <- opt$outliers
   outliers <- readLines(outliers_path, warn = FALSE)
 } else {
   stop("Path to outliers file must be provided. See script usage (--help)")
+}
+if (!is.na(opt$variables)) {
+  variables_path <- opt$variables
+  color_vars <- readLines(variables_path, warn = FALSE)
+  if(!"seq_bin" %in% color_vars){
+    color_vars <- c(color_vars, "seq_bin")
+  }
+} else {
+  stop("Path to variables file must be provided. See script usage (--help)")
 }
 
 setwd(script_dir)
@@ -98,25 +110,31 @@ for(i in 1:length(types)){
   ps_samples <- prune_samples(sample_data(ps)$is_control == FALSE, ps)
   
   # filter outliers out of data and metadata
-  ps_filtered <- prune_samples(!(sample_names(ps) %in% outliers), ps)
+  ps_filtered <- prune_samples(!(sample_names(ps_samples) %in% outliers), 
+                               ps_samples)
   sample_metadata <- as.data.frame(as.matrix(ps_filtered@sam_data))
-  sample_otu <- as.data.frame(otu_data(ps_filtered))
+  sample_otu <- as.data.frame(otu_table(ps_filtered))
   
   print("Visualizing removal of outliers:")
   setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
                "/Figures"))
-  # evaluate whether you have removed all outliers; re-run until you feel you have 
-  # removed all outliers in the above lines
-  id_outliers_evaluate_seq_depth(sample_otu, sample_metadata, types[i], yourname, 
-                                 amplicon, date, "outliers_removed")
+  # evaluate whether you have removed all outliers; re-run until you feel you  
+  # have removed all outliers in the above lines
+  id_outliers_evaluate_seq_depth(sample_otu, sample_metadata, types[i], 
+                                 yourname, amplicon, date, "outliers_removed", 
+                                 color_vars)
   
   print("Testing drop thresholds:")
   threshold1 <- thresholds$threshold1[which(thresholds$sample_type == types[i])]
   threshold2 <- thresholds$threshold2[which(thresholds$sample_type == types[i])]
   test_drop_threshold(sample_otu, sample_metadata, types[i], yourname, amplicon, 
-                      date, threshold1)
+                      date, threshold1, color_vars)
+  print("Samples with <", threshold1, " reads:")
+  rownames(sample_metadata)[which(sample_metadata$seq_count_dada2 < threshold1)]
   test_drop_threshold(sample_otu, sample_metadata, types[i], yourname, amplicon, 
-                      date, threshold2)
+                      date, threshold2, color_vars)
+  print("Samples with <", threshold2, " reads:")
+  rownames(sample_metadata)[which(sample_metadata$seq_count_dada2 < threshold2)]
 }
 
 print("Done with all sample types. Check the saved figures to see if you have any remaining outliers and/or if the one of the drop thresholds you tested is okay. I'd suggest testing 2+ drop thresholds!")

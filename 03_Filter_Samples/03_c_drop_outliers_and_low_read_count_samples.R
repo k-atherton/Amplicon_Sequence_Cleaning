@@ -109,7 +109,8 @@ for(i in 1:length(types)){
   
   # filter outliers out of data and metadata
   print("Removing outliers")
-  ps_filtered <- prune_samples(!(sample_names(ps) %in% outliers), ps)
+  ps_filtered <- prune_samples(!(sample_names(ps_samples) %in% outliers), 
+                               ps_samples)
   sample_metadata <- as.data.frame(as.matrix(ps_filtered@sam_data))
   
   # subset the filtered samples out of the phyloseq

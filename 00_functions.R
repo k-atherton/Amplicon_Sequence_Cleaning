@@ -317,102 +317,56 @@ plot_prefilter_seq_depth <- function(metadata, sample_type, proposed_threshold,
                 ".png"), width = 9, height = 5, units = "in", dpi = 300)
 }
 
-id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type, yourname, 
-                                           amplicon, date, rep){
-  # make a transposed verison of the sequencing data
+id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type, 
+                                           yourname, amplicon, date, rep, 
+                                           color_vars){
+  # Transpose the sequencing data
   print("Transposing the sequencing data:")
-  data_t <- as.data.frame(t(otu_data))
+  data_t <- as.data.frame(t(data))
   
-  # calculate Aitchison distance for samples
+  # Calculate Aitchison distance
   print("Calculating the Aitchison's distance for the samples")
-  aitch_data <- aDist(data_t+1, y = NULL) #need to add +1 otherwise all values are NA due to 0s in df
+  aitch_data <- aDist(data_t + 1)  # Add 1 to avoid zero issues
   aitch_data <- as.matrix(aitch_data)
   
-  # test for sequencing batch and depth effect
+  # Test for sequencing batch and depth effects
   print(paste0("Testing for sequencing batch effect in ", sample_type, 
                " samples:"))
-  print(adonis2(aitch_data~as.factor(metadata$sequencing_batch)))
+  print(adonis2(aitch_data ~ as.factor(metadata$sequencing_batch)))
   print(paste0("Testing for sequencing depth effect in ", sample_type, 
                " samples:"))
-  print(adonis2(aitch_data~as.numeric(metadata$seq_count_dada2)))
+  print(adonis2(aitch_data ~ as.numeric(metadata$seq_count_dada2)))
   
+  # Perform NMDS
   print("Calculating NMDS for plotting.")
-  all.MDS <- metaMDS(aitch_data,k=2,zerodist="add")
+  all.MDS <- metaMDS(aitch_data, k = 2, zerodist = "add")
   coordinates <- data.frame(scores(all.MDS))
   coordinates <- cbind(coordinates, metadata)
   
-  # plot samples by different variables
+  # Generate NMDS plots for each variable in color_vars
   print("Plotting samples by different variables")
-  ggplot(coordinates,
-         aes(x = NMDS1,
-             y = NMDS2)) +
-    geom_text(label = rownames(coordinates),
-              size = 2) +
-    stat_ellipse() +
-    theme_bw() + expand_limits(x = c(min(coordinates$NMDS1) - 10, 
-                                     max(coordinates$NMDS1) + 10))
+  plot_list <- lapply(color_vars, function(var) {
+    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
+      geom_point() +
+      stat_ellipse() +
+      theme_bw() +
+      ggtitle(paste("NMDS colored by", var))
+  })
+  
+  # Arrange plots in a grid
+  multipanel <- do.call(grid.arrange, c(plot_list, 
+                                        nrow = ceiling(length(plot_list) / 3), 
+                                        ncol = min(3, length(plot_list))))
+  
+  # Save the multipanel figure
   ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
-                "_NMDS_identify_outliers_", rep, date, ".png"), width = 7, 
-         height = 5, units = "in", dpi = 300)
-  
-  by_batch <- ggplot(coordinates,
-                     aes(x = NMDS1,
-                         y = NMDS2,
-                         col = as.factor(sequencing_batch))) +
-    geom_point() +
-    stat_ellipse() +
-    theme_bw()
-  
-  by_seqdepth <- ggplot(coordinates,
-                        aes(x = NMDS1,
-                            y = NMDS2,
-                            col = as.factor(seq_bin))) +
-    geom_point() +
-    stat_ellipse() +
-    theme_bw()
-  
-  by_treeage <- ggplot(coordinates,
-                       aes(x = NMDS1,
-                           y = NMDS2,
-                           col = as.factor(tree_age))) +
-    geom_point() +
-    stat_ellipse() +
-    theme_bw()
-  
-  by_treepittype <- ggplot(coordinates,
-                           aes(x = NMDS1,
-                               y = NMDS2,
-                               col = as.factor(tree_pit_type))) +
-    geom_point() +
-    stat_ellipse() +
-    theme_bw()
-  
-  by_species <- ggplot(coordinates,
-                       aes(x = NMDS1,
-                           y = NMDS2,
-                           col = as.factor(tree_species))) +
-    geom_point() +
-    stat_ellipse() +
-    theme_bw()
-  
-  by_site <- ggplot(coordinates,
-                    aes(x = NMDS1,
-                        y = NMDS2,
-                        col = as.factor(site_name))) +
-    geom_point() +
-    stat_ellipse() +
-    theme_bw()
-  
-  multipanel <- grid.arrange(by_batch, by_seqdepth, by_treeage, by_treepittype, 
-                             by_species, by_site, nrow = 2, ncol = 3)
-  
-  ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
-                "_NMDS_predrop_datastructure_", rep, date, ".png"), multipanel, 
-         width = 21, height = 10, units = "in", dpi = 300)
+                "_NMDS_predrop_datastructure_", rep, date, ".png"), 
+         multipanel, width = (7*ceiling(length(plot_list)/3)), 
+         height = (5*min(3, length(plot_list))), units = "in", dpi = 300)
 }
 
 test_drop_threshold <- function(data, metadata, sample_type, yourname, 
-                                amplicon, date, threshold){
+                                amplicon, date, threshold, color_vars){
   # drop samples < threshold
   print(paste0("Keeping samples with dada2 read count > ", threshold, "."))
   metadata_drop <- metadata[metadata$seq_count_dada2 > threshold,]
@@ -440,38 +394,23 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   coordinates<-data.frame(scores(all.MDS))
   coordinates <- cbind(coordinates, metadata_drop)
   
-  # plot samples by different variables
-  print("Plotting samples by different variables.")
-  by_batch <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2,
-                                      col = as.factor(sequencing_batch))) +
-    geom_point() + stat_ellipse() + theme_bw()
+  print("Plotting samples by different variables")
+  plot_list <- lapply(color_vars, function(var) {
+    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
+      geom_point() +
+      stat_ellipse() +
+      theme_bw() +
+      ggtitle(paste("NMDS colored by", var))
+  })
   
-  by_seqdepth <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2,
-                                         col = as.factor(seq_bin))) +
-    geom_point() + stat_ellipse() + theme_bw()
+  # Arrange plots in a grid
+  multipanel <- do.call(grid.arrange, c(plot_list, nrow = ceiling(length(plot_list) / 3), ncol = min(3, length(plot_list))))
   
-  by_treeage <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2,
-                                        col = as.factor(tree_age))) +
-    geom_point() + stat_ellipse() + theme_bw()
-  
-  by_treepittype <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2,
-                                            col = as.factor(tree_pit_type))) +
-    geom_point() + stat_ellipse() + theme_bw()
-  
-  by_species <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2, 
-                                        col = as.factor(tree_species))) +
-    geom_point() + stat_ellipse() + theme_bw()
-  
-  by_site <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2, 
-                                     col = as.factor(site_name))) +
-    geom_point() + stat_ellipse() + theme_bw()
-  
-  multipanel <- grid.arrange(by_batch, by_seqdepth, by_treeage, by_treepittype, 
-                             by_species, by_site, nrow = 2, ncol = 3)
-  
-  ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
-                "_NMDS_drop", threshold, date, ".png"), multipanel, 
-         width = 21, height = 10, units = "in", dpi = 300)
+  # Save the multipanel figure
+  ggsave(paste0(yourname, "_", amplicon, "_", sample_type, "_NMDS_drop_", 
+                threshold, "_datastructure_", rep, date, ".png"), 
+         multipanel, width = (7*ceiling(length(plot_list)/3)), 
+         height = (5*min(3, length(plot_list))), units = "in", dpi = 300)
   
 }
 

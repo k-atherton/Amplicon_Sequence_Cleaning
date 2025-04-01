@@ -29,7 +29,10 @@ option_list = list(
   make_option(c("-s","--scriptdir"), type="character", 
               default="/projectnb/talbot-lab-data/Katies_data/Amplicon_Sequence_Cleaning/",
               help="path to function script directory, [default = %default]",
-              metavar="script_directory")
+              metavar="script_directory"),
+  make_option(c("-v", "--variables"), type="character", default=NA, 
+              help="text file with list of varibles to color data by for NMDS plots",
+              metavar="variables")
 )
 
 opt_parser = OptionParser(option_list=option_list)
@@ -48,6 +51,15 @@ if (!is.na(opt$metadata)) {
   metadata_path <- opt$metadata
 } else {
   stop("Path to metadata file must be provided. See script usage (--help)")
+}
+if (!is.na(opt$variables)) {
+  variables_path <- opt$variables
+  color_vars <- readLines(variables_path, warn = FALSE)
+  if(!"seq_bin" %in% color_vars){
+    color_vars <- c(color_vars, "seq_bin")
+  }
+} else {
+  stop("Path to variables file must be provided. See script usage (--help)")
 }
 
 setwd(script_dir)
@@ -69,8 +81,8 @@ for(i in 1:length(types)){
   setwd(paste0(pwd,"02_Clean_Data/02_DADA2_ASV_Tables/",amplicon))
   print("Reading in most recent version of phyloseq object:")
   ps <- read_in_file(getwd(), paste0("atherton_", amplicon, 
-                                     "_phyloseq_",types[i],"_raw_withnegcontrols_"), 
-                     ".RDS")
+                                     "_phyloseq_", types[i], 
+                                     "_raw_withnegcontrols_"), ".RDS")
   
   print("Saving negative controls")
   ps_nc <- prune_samples(sample_data(ps)$is_control == TRUE, ps)
@@ -88,23 +100,27 @@ for(i in 1:length(types)){
   sample_metadata <- bin_seq_depth(sample_metadata)
   
   print("Visualizing raw data")
-  ensure_directory_exists(paste0(pwd,"02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
+  ensure_directory_exists(paste0(pwd,
+                                 "02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
                                  amplicon, "/Figures"))
-  ensure_directory_exists(paste0(pwd,"02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
+  ensure_directory_exists(paste0(pwd,
+                                 "02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
                                  amplicon, "/Figures/",types[i]))
   setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
                "/Figures"))
   plot_prefilter_seq_depth(sample_metadata, types[i], 8000, date)
   
   print("Looking for outliers:")
-  ensure_directory_exists(paste0(pwd,"02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
+  ensure_directory_exists(paste0(pwd,
+                                 "02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
                                  amplicon, "/Figures/", types[i]))
   setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
                "/Figures/", types[i]))
   
   otu_raw <- otu_table(ps_samples)
   id_outliers_evaluate_seq_depth(otu_raw, sample_metadata, types[i], yourname, 
-                                 amplicon, date, "no_outliers_removed")
+                                 amplicon, date, "no_outliers_removed", 
+                                 color_vars)
 }
 
 print("Done with all sample types. Check the saved figures to identify outliers.")
