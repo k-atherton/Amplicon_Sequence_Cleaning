@@ -313,8 +313,8 @@ plot_prefilter_seq_depth <- function(metadata, sample_type, proposed_threshold,
     labs(x = "Read count after DADA2", y = "count", fill = "Sequencing batch")
   
   ggsave(paste0(sample_type, "/", yourname, "_", amplicon, "_", sample_type, 
-                "_sequencing_depth_prefilter", date,".png"), width = 9, 
-         height = 5, units = "in", dpi = 300)
+                "_sequencing_depth_prefilter_drop", proposed_threshold, date,
+                ".png"), width = 9, height = 5, units = "in", dpi = 300)
 }
 
 id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type, yourname, 
@@ -349,7 +349,8 @@ id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type, yourname
     geom_text(label = rownames(coordinates),
               size = 2) +
     stat_ellipse() +
-    theme_bw()
+    theme_bw() + expand_limits(x = c(min(coordinates$NMDS1) - 10, 
+                                     max(coordinates$NMDS1) + 10))
   ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
                 "_NMDS_identify_outliers_", rep, date, ".png"), width = 7, 
          height = 5, units = "in", dpi = 300)

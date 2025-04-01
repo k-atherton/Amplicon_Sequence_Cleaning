@@ -28,7 +28,8 @@ Rscript $script_dir/02_Format_Raw_DADA2_ASV_Tables/02_format_raw_dada2_asv_table
 	-v <path to file with list of ASV table paths> \ # see documentation
 	-t <path to file with list of taxonomy table paths> \ # see documentation
 	-m <path to metadata file> \ # see documentation
-	-c <path to file with negative control naming patterns> # see documentation
+	-c <path to file with negative control naming patterns> \ # see documentation
+	-s $script_dir
 
 echo "Running on ITS data"
 Rscript $script_dir/02_Format_Raw_DADA2_ASV_Tables/02_format_raw_dada2_asv_tables.R \
@@ -39,5 +40,6 @@ Rscript $script_dir/02_Format_Raw_DADA2_ASV_Tables/02_format_raw_dada2_asv_table
 	-v <path to file with list of ASV table paths> \ # see documentation
 	-t <path to file with list of taxonomy table paths> \ # see documentation
 	-m <path to metadata file> \ # see documentation
-	-c <path to file with negative control naming patterns> # see documentation
+	-c <path to file with negative control naming patterns> \ # see documentation
+	-s $script_dir
 echo "Done."
