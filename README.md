@@ -67,9 +67,26 @@ To run this script, adjust the inputs for each respective flag within the script
   - Last name (flag: -n or --name): your last name for output file naming scheme [default = atherton]
   - Working directory (flag: -p or --pwd): Directory for saving the outputs of the script [default is the result of the function getwd() in R]
   - Metadata file (flag: -m or --metadata): the file should be a .csv and have a column name called sample_type, which defines the sample types (e.g. "leaf", "negative control", "soil", etc.). The metadata file should also have a column called is_control with values TRUE (in rows for negative controls) or FALSE (in rows for samples).
-  - File with negative control naming patterns, matched to the sample types that the negative controls were amplified and sequenced with (flag: -c or --negcontrols): the file should be a .csv and have a column called sample_type with the sample type that matches the sample_type names in the metadata file and another column called negative_control_name_pattern that contains strings that define the naming patterns of the negative controls. You can use the whole negative control sample names, or just a pattern that will allow a function like grep to find the negative control samples. See `example_negative_control_name_file.csv`
-    - **Make this file yourself**
   - Script directory (flag: -s or --scriptdir): path to the function script directory where the 00_functions.R script is held
+  - File with metadata column names for NMDS plotting (flag: -v or --variables): the file should be a .txt and each row should have a column name within the metadata file. The variables included in this file will be used to color NMDS plots of the samples to visualize the data structure as determined by these variables. Ideally, the variables will be factors, but continuous variables are also okay.
+    - **Make this file yourself**
+- Outputs:
+  - Figure: NMDS of the samples where the points are the sample names to ID outliers. Use your best judgement to remove any outliers -- I typically remove any samples whose names I can clearly read that are far from any other samples. You'll know it when you see it.
+  - Figure: multipanel NMDS of the data structure before removing outliers, coloring the samples by different variables.
+  - Figure: histogram of the sample sequencing depths before dropping any samples.
+
+### Step 3b: Evaluate drop thresholds
+**Filename: `03_Filter_Samples/03_b_evaluate_drop_thresholds.R`**
+- Required inputs:
+  - Amplicon type (flag: -a or --amplicon): amplicon type of the dataset; options: 16S or ITS [default = 16S]
+  - Last name (flag: -n or --name): your last name for output file naming scheme [default = atherton]
+  - Working directory (flag: -p or --pwd): Directory for saving the outputs of the script [default is the result of the function getwd() in R]
+  - Metadata file (flag: -m or --metadata): the file should be a .csv and have a column name called sample_type, which defines the sample types (e.g. "leaf", "negative control", "soil", etc.). The metadata file should also have a column called is_control with values TRUE (in rows for negative controls) or FALSE (in rows for samples).
+  - Script directory (flag: -s or --scriptdir): path to the function script directory where the 00_functions.R script is held
+  - File with sequence read depth thresholds to test (flag: -t or --thresholds): the file should be a .csv with three columns: sample_type (which contains the sample types matching the sample_type column in the metadata file, not including negative controls), threshold1, and threshold2 (numbers used to test the threshold at which to drop samples if they have a post-DADA2 read count less than the threshold -- I typically evaluate thresholds between 5000 and 10000).
+    - **Make this file yourself** 
+  - File with the names of outlier samples to drop (flag: -o or --outliers): the file should be a .txt and each row should have a sample name which you identified in Step 3a.
+    - **Make this file yourself based on your findings from step 3a**
   - File with metadata column names for NMDS plotting (flag: -v or --variables): the file should be a .txt and each row should have a column name within the metadata file. The variables included in this file will be used to color NMDS plots of the samples to visualize the data structure as determined by these variables. Ideally, the variables will be factors, but continuous variables are also okay.
     - **Make this file yourself**
 - Outputs:
