@@ -346,7 +346,7 @@ id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type,
   # Generate NMDS plots for each variable in color_vars
   print("Plotting samples by different variables")
   plot_list <- lapply(color_vars, function(var) {
-    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
+    ggplot(coordinates, aes(x = "NMDS1", y = "NMDS2", col = var)) +
       geom_point() +
       stat_ellipse() +
       theme_bw() +
@@ -354,14 +354,35 @@ id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type,
   })
   
   # Arrange plots in a grid
+  print("Arrange plots in a grid")
   multipanel <- do.call(grid.arrange, c(plot_list, 
                                         nrow = ceiling(length(plot_list) / 3), 
                                         ncol = min(3, length(plot_list))))
   
   # Save the multipanel figure
+  print("Saving multipanel figures")
   ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
                 "_NMDS_predrop_datastructure_", rep, date, ".png"), 
          multipanel, width = (7*ceiling(length(plot_list)/3)), 
+         height = (5*min(3, length(plot_list))), units = "in", dpi = 300)
+  
+  coordinates$sample_name <- rownames(coordinates)
+  
+  # Make plot with sample name as point
+  print("Make outlier ID figure")
+  range_x <- range(coordinates$NMDS1, na.rm = TRUE)
+  outlier_id <- ggplot(coordinates, aes(x = NMDS1, y = NMDS2, 
+                                               label = rownames(coordinates))) +
+    geom_text(size = 2) +
+    stat_ellipse() +
+    theme_bw() + xlim(c(range_x[1] - 25, range_x[2] + 25)) +
+    ggtitle(paste0("Identify outliers in ", sample_type, " samples"))
+  
+  # Save the figure
+  print("Save figure")
+  ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
+                "_outlier_id_plot_", rep, date, ".png"), 
+         outlier_id, width = (7*ceiling(length(plot_list)/3)), 
          height = (5*min(3, length(plot_list))), units = "in", dpi = 300)
 }
 
@@ -369,7 +390,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
                                 amplicon, date, threshold, color_vars){
   # drop samples < threshold
   print(paste0("Keeping samples with dada2 read count > ", threshold, "."))
-  metadata_drop <- metadata[metadata$seq_count_dada2 > threshold,]
+  metadata_drop <- metadata[as.numeric(metadata$seq_count_dada2) > threshold,]
   data_drop <- data[,colnames(data) %in% rownames(metadata_drop)]
   
   # make a transposed verison of the sequencing data
@@ -396,7 +417,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   
   print("Plotting samples by different variables")
   plot_list <- lapply(color_vars, function(var) {
-    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
+    ggplot(coordinates, aes(x = "NMDS1", y = "NMDS2", col = var)) +
       geom_point() +
       stat_ellipse() +
       theme_bw() +
@@ -404,7 +425,9 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   })
   
   # Arrange plots in a grid
-  multipanel <- do.call(grid.arrange, c(plot_list, nrow = ceiling(length(plot_list) / 3), ncol = min(3, length(plot_list))))
+  multipanel <- do.call(grid.arrange, c(plot_list, 
+                                        nrow = ceiling(length(plot_list) / 3), 
+                                        ncol = min(3, length(plot_list))))
   
   # Save the multipanel figure
   ggsave(paste0(yourname, "_", amplicon, "_", sample_type, "_NMDS_drop_", 

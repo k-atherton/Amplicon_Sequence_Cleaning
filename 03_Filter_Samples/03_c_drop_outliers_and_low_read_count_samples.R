@@ -88,9 +88,8 @@ if(edit_metadata == "Y"){
 }
 
 # get sample types
-types <- unique(metadata$sample_type)
+types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
 print("Sample types:")
-types <- types[!grepl("Negative Control", types)]
 print(types)
 for(i in 1:length(types)){
   print(paste0("Processing ", types[i], " samples"))

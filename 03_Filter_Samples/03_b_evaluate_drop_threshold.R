@@ -46,7 +46,6 @@ opt = parse_args(opt_parser)
 
 amplicon <- opt$amplicon
 yourname <- opt$name
-edit_metadata <- opt$edit
 if(endsWith(opt$pwd, "/")){
   pwd <- opt$pwd
 } else{
@@ -62,6 +61,7 @@ if (!is.na(opt$metadata)) {
 if (!is.na(opt$threshold)) {
   threshold_path <- opt$threshold
   thresholds <- read.csv(threshold_path)
+  head(thresholds)
 } else {
   stop("Path to threshold file must be provided. See script usage (--help)")
 }
@@ -90,9 +90,8 @@ print("Reading in metadata file...")
 metadata <- read_csv(metadata_path)
 
 # get sample types
-types <- unique(metadata$sample_type)
+types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
 print("Sample types:")
-types <- types[!grepl("Negative Control", types)]
 print(types)
 for(i in 1:length(types)){
   print(paste0("Processing ", types[i], " samples"))
@@ -115,9 +114,15 @@ for(i in 1:length(types)){
   sample_metadata <- as.data.frame(as.matrix(ps_filtered@sam_data))
   sample_otu <- as.data.frame(otu_table(ps_filtered))
   
+  # make sequencing depth sample_metadata
+  sample_metadata$seq_count_data2 <- as.numeric(sample_metadata$seq_count_dada2)
+  
+  print("Binning sequencing depth")
+  sample_metadata <- bin_seq_depth(sample_metadata)
+  
   print("Visualizing removal of outliers:")
   setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
-               "/Figures"))
+               "/Figures/", types[i]))
   # evaluate whether you have removed all outliers; re-run until you feel you  
   # have removed all outliers in the above lines
   id_outliers_evaluate_seq_depth(sample_otu, sample_metadata, types[i], 

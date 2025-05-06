@@ -12,7 +12,7 @@ library(readr)
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
 date <- format(Sys.Date(),"_%Y%m%d")
-pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS/"
+pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS_ED/"
 
 option_list = list(
   make_option(c("-a", "--amplicon"), type="character", default="16S", 
@@ -40,7 +40,6 @@ opt = parse_args(opt_parser)
 
 amplicon <- opt$amplicon
 yourname <- opt$name
-edit_metadata <- opt$edit
 if(endsWith(opt$pwd, "/")){
   pwd <- opt$pwd
 } else{
@@ -71,10 +70,17 @@ print("Reading in metadata file...")
 metadata <- read_csv(metadata_path)
 
 # get sample types
-types <- unique(metadata$sample_type)
+types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
 print("Sample types:")
-types <- types[!grepl("Negative Control", types)]
 print(types)
+
+if("Soil" %in% types){
+  metadata$sample_type <- paste0(metadata$soil_horizon, metadata$sample_type)
+  metadata$sample_type <- gsub("NALeaf", "Leaf", metadata$sample_type)
+  metadata$sample_type <- gsub(".*Root", "Root", metadata$sample_type)
+  types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
+}
+
 for(i in 1:length(types)){
   print(paste0("Processing ", types[i], " samples"))
   
