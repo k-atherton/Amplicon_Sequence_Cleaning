@@ -90,6 +90,7 @@ To run this script, adjust the inputs for each respective flag within the script
   - File with metadata column names for NMDS plotting (flag: -v or --variables): the file should be a .txt and each row should have a column name within the metadata file. The variables included in this file will be used to color NMDS plots of the samples to visualize the data structure as determined by these variables. Ideally, the variables will be factors, but continuous variables are also okay.
     - **Make this file yourself**
 - Outputs:
-  - Figure: NMDS of the samples where the points are the sample names to ID outliers. Use your best judgement to remove any outliers -- I typically remove any samples whose names I can clearly read that are far from any other samples. You'll know it when you see it.
-  - Figure: multipanel NMDS of the data structure before removing outliers, coloring the samples by different variables.
-  - Figure: histogram of the sample sequencing depths before dropping any samples.
+  - Figure: NMDS of the samples where the points are the sample names to ID outliers, after the previously identified outliers were removed. Use this to see if you missed any outliers.
+  - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold1, coloring the samples by different variables.
+  - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold2, coloring the samples by different variables.
+    - The main thing you're looking for here is that there isn't a significant restructuring of your data before/after dropping samples. Based on these NMDS figures, decide which threshold to go with. The bash output will list the number of samples and names of samples dropped for each threshold. Use that to determine if too many samples total or if too many samples from one treatment were dropped by either threshold in order to make your decision. 
