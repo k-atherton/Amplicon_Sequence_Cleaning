@@ -346,7 +346,7 @@ id_outliers_evaluate_seq_depth <- function(data, metadata, sample_type,
   # Generate NMDS plots for each variable in color_vars
   print("Plotting samples by different variables")
   plot_list <- lapply(color_vars, function(var) {
-    ggplot(coordinates, aes(x = "NMDS1", y = "NMDS2", col = var)) +
+    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
       geom_point() +
       stat_ellipse() +
       theme_bw() +
@@ -392,6 +392,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   print(paste0("Keeping samples with dada2 read count > ", threshold, "."))
   metadata_drop <- metadata[as.numeric(metadata$seq_count_dada2) > threshold,]
   data_drop <- data[,colnames(data) %in% rownames(metadata_drop)]
+  print(nrow(metadata_drop))
   
   # make a transposed verison of the sequencing data
   print("Transposing the sequencing data.")
@@ -404,6 +405,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   
   # test for sequencing batch and depth effect
   print("Testing sequencing batch effect:")
+  print(unique(metadata_drop$sequencing_batch))
   print(adonis2(aitch ~ as.factor(metadata_drop$sequencing_batch)))
   
   print("Testing sequencing depth effect:")
@@ -417,7 +419,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   
   print("Plotting samples by different variables")
   plot_list <- lapply(color_vars, function(var) {
-    ggplot(coordinates, aes(x = "NMDS1", y = "NMDS2", col = var)) +
+    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
       geom_point() +
       stat_ellipse() +
       theme_bw() +
@@ -431,7 +433,7 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   
   # Save the multipanel figure
   ggsave(paste0(yourname, "_", amplicon, "_", sample_type, "_NMDS_drop_", 
-                threshold, "_datastructure_", rep, date, ".png"), 
+                threshold, "_datastructure", date, ".png"), 
          multipanel, width = (7*ceiling(length(plot_list)/3)), 
          height = (5*min(3, length(plot_list))), units = "in", dpi = 300)
   

@@ -79,6 +79,7 @@ if("Soil" %in% types){
   metadata$sample_type <- gsub("NALeaf", "Leaf", metadata$sample_type)
   metadata$sample_type <- gsub(".*Root", "Root", metadata$sample_type)
   types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
+  print(types)
 }
 
 for(i in 1:length(types)){
@@ -113,7 +114,7 @@ for(i in 1:length(types)){
                                  "02_Clean_Data/03_Filter_Samples_ASV_Tables/", 
                                  amplicon, "/Figures/",types[i]))
   setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
-               "/Figures"))
+               "/Figures/"))
   plot_prefilter_seq_depth(sample_metadata, types[i], 8000, date)
   
   print("Looking for outliers:")

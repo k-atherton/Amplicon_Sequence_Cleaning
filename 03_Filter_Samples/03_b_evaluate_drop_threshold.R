@@ -12,7 +12,7 @@ library(readr)
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
 date <- format(Sys.Date(),"_%Y%m%d")
-pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS/"
+pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS_ED/"
 
 option_list = list(
   make_option(c("-a", "--amplicon"), type="character", default="16S", 
@@ -30,7 +30,7 @@ option_list = list(
               default="/projectnb/talbot-lab-data/Katies_data/Amplicon_Sequence_Cleaning/",
               help="path to function script directory, [default = %default]",
               metavar="script_directory"),
-  make_option(c("-t", "--threshold"), type="numeric", default=NA, 
+  make_option(c("-t", "--threshold"), type="character", default=NA, 
               help="a .csv file that has three columns: sample_type (which matches the sample types (not including negative controls) in the metadata file) and threshold1 and threshold2 (defines the minimum number of reads needed for a sample to be kept for downstream analysis; recommend ~5000-8000 and ~8000-10000)[default= %default]",
               metavar="threshold"),
   make_option(c("-o", "--outliers"), type="character", default=NA,
@@ -60,7 +60,7 @@ if (!is.na(opt$metadata)) {
 }
 if (!is.na(opt$threshold)) {
   threshold_path <- opt$threshold
-  thresholds <- read.csv(threshold_path)
+  thresholds <- vroom::vroom(threshold_path)
   head(thresholds)
 } else {
   stop("Path to threshold file must be provided. See script usage (--help)")
@@ -93,6 +93,15 @@ metadata <- read_csv(metadata_path)
 types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
 print("Sample types:")
 print(types)
+
+if("Soil" %in% types){
+  metadata$sample_type <- paste0(metadata$soil_horizon, metadata$sample_type)
+  metadata$sample_type <- gsub("NALeaf", "Leaf", metadata$sample_type)
+  metadata$sample_type <- gsub(".*Root", "Root", metadata$sample_type)
+  types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
+  print(types)
+}
+
 for(i in 1:length(types)){
   print(paste0("Processing ", types[i], " samples"))
   
@@ -134,12 +143,12 @@ for(i in 1:length(types)){
   threshold2 <- thresholds$threshold2[which(thresholds$sample_type == types[i])]
   test_drop_threshold(sample_otu, sample_metadata, types[i], yourname, amplicon, 
                       date, threshold1, color_vars)
-  print("Samples with <", threshold1, " reads:")
-  rownames(sample_metadata)[which(sample_metadata$seq_count_dada2 < threshold1)]
+  print(paste0("Samples with <", threshold1, " reads:"))
+  print(rownames(sample_metadata)[which(as.numeric(sample_metadata$seq_count_dada2) < threshold1)])
   test_drop_threshold(sample_otu, sample_metadata, types[i], yourname, amplicon, 
                       date, threshold2, color_vars)
-  print("Samples with <", threshold2, " reads:")
-  rownames(sample_metadata)[which(sample_metadata$seq_count_dada2 < threshold2)]
+  print(paste0("Samples with <", threshold2, " reads:"))
+  print(rownames(sample_metadata)[which(as.numeric(sample_metadata$seq_count_dada2) < threshold2)])
 }
 
 print("Done with all sample types. Check the saved figures to see if you have any remaining outliers and/or if the one of the drop thresholds you tested is okay. I'd suggest testing 2+ drop thresholds!")
