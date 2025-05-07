@@ -94,4 +94,25 @@ To run this script, adjust the inputs for each respective flag within the script
   - Figure: multipanel NMDS of the data structure after removing outliers, coloring the samples by different variables.
   - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold1, coloring the samples by different variables.
   - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold2, coloring the samples by different variables.
-    - The main thing you're looking for here is that there isn't a significant restructuring of your data before/after dropping samples. Based on these NMDS figures, decide which threshold to go with. The bash output will list the number of samples and names of samples dropped for each threshold. Use that to determine if too many samples total or if too many samples from one treatment were dropped by either threshold in order to make your decision. 
+    - The main thing you're looking for here is that there isn't a significant restructuring of your data before/after dropping samples. Based on these NMDS figures, decide which threshold to go with. The bash output will list the number of samples and names of samples dropped for each threshold. Use that to determine if too many samples total or if too many samples from one treatment were dropped by either threshold in order to make your decision.
+### Step 3c: Drop outliers and low read count samples
+**Filename: `03_Filter_Samples/03_c_drop_outliers_and_low_read_count_samples.R`**
+- Required inputs:
+  - Amplicon type (flag: -a or --amplicon): amplicon type of the dataset; options: 16S or ITS [default = 16S]
+  - Last name (flag: -n or --name): your last name for output file naming scheme [default = atherton]
+  - Edit metadata file (flag: -e or --edit): Do you want to make edits to the metadata file; options: Y or N [default = N]
+  - Working directory (flag: -p or --pwd): Directory for saving the outputs of the script [default is the result of the function getwd() in R]
+  - Metadata file (flag: -m or --metadata): the file should be a .csv and have a column name called sample_type, which defines the sample types (e.g. "leaf", "negative control", "soil", etc.). The metadata file should also have a column called is_control with values TRUE (in rows for negative controls) or FALSE (in rows for samples).
+  - Script directory (flag: -s or --scriptdir): path to the function script directory where the 00_functions.R script is held
+  - File with the threshold to drop samples with low reads (flag: -t or --thresholds): the file should be a .csv with three columns: sample_type (which contains the sample types matching the sample_type column in the metadata file, not including negative controls), and threshold (number used to drop samples if they have a post-DADA2 read count less than the threshold).
+    - **Make this file yourself, based on your findings from Step 3b** 
+  - File with the names of outlier samples to drop (flag: -o or --outliers): the file should be a .txt and each row should have a sample name which you identified in Step 3a.
+    - **Make this file yourself based on your findings from Step 3a**
+  - File with metadata column names for NMDS plotting (flag: -v or --variables): the file should be a .txt and each row should have a column name within the metadata file. The variables included in this file will be used to color NMDS plots of the samples to visualize the data structure as determined by these variables. Ideally, the variables will be factors, but continuous variables are also okay.
+    - **Make this file yourself**
+- Outputs:
+  - Figure: histogram of the sample sequencing depths after dropping all outliers and low read count samples.
+  - File: ASV table without dropped samples (csv and phyloseq RDS versions)
+  - File: ASV table without dropped samples, including negative controls (phyloseq RDS)
+  - If -e flag == Y: File: metadata table with new column "sequences_dropped". Containes values "No" for samples kept for downstream analysis, "Outlier" for samples identified as outliers in steps 3a, or "Low read count" for samples dropped because they have a read count < threshold.
+
