@@ -12,7 +12,6 @@ library(readr)
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
 date <- format(Sys.Date(),"_%Y%m%d")
-pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS_ED/"
 
 option_list = list(
   make_option(c("-a", "--amplicon"), type="character", default="16S", 
@@ -20,7 +19,7 @@ option_list = list(
               metavar="amplicon"),
   make_option(c("-n", "--name"), type="character", default="atherton", 
               help="last name for output file naming scheme [default= %default]", 
-              metavar="your_name"),
+              metavar="yourname"),
   make_option(c("-p", "--pwd"), type="character", default=getwd(),
               help="the directory for saving the outputs of this script [default= %default]",
               metavar="working_directory"),

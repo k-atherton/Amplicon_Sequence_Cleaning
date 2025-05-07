@@ -439,6 +439,27 @@ test_drop_threshold <- function(data, metadata, sample_type, yourname,
   
 }
 
+plot_filter_seq_depth <- function(metadata, sample_type, threshold, date){
+  print("Plotting the pre-filtered sequencing depth as a histogram.")
+  ggplot(metadata, 
+         aes(as.numeric(seq_count_dada2), 
+             fill = sequencing_batch)) + 
+    geom_histogram(binwidth = 1000) + 
+    theme_bw() + 
+    ggtitle(paste0(sample_type, " sequencing depth histogram")) + 
+    geom_vline(aes(xintercept=median(as.numeric(seq_count_dada2))), 
+               color="blue", 
+               linetype="dashed") + 
+    geom_vline(aes(xintercept=threshold), 
+               color="red", 
+               linetype="dashed") +
+    labs(x = "Read count after DADA2", y = "count", fill = "Sequencing batch")
+  
+  ggsave(paste0(sample_type, "/", yourname, "_", amplicon, "_", sample_type, 
+                "_sequencing_depth_filtered_drop", proposed_threshold, date,
+                ".png"), width = 9, height = 5, units = "in", dpi = 300)
+}
+
 decontaminate_samples <- function(ps, sample_type, yourname, amplicon, date){
   print(sample_type)
   # get the batch IDs

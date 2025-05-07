@@ -4,15 +4,10 @@ library(optparse)
 library(vroom)
 library(phyloseq)
 library(ggplot2)
-library(robCompositions)
-library(gridExtra)
-library(vegan)
-library(readr)
 
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
 date <- format(Sys.Date(),"_%Y%m%d")
-pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS/"
 
 option_list = list(
   make_option(c("-a", "--amplicon"), type="character", default="16S", 
@@ -20,7 +15,7 @@ option_list = list(
               metavar="amplicon"),
   make_option(c("-n", "--name"), type="character", default="atherton", 
               help="last name for output file naming scheme [default= %default]", 
-              metavar="your_name"),
+              metavar="yourname"),
   make_option(c("-e", "--edit"), type="character", default="N", 
               help="do you want to edit the metadata file? options: Y or N [default= %default]", 
               metavar="edit_metadata"),
@@ -33,7 +28,7 @@ option_list = list(
               default="/projectnb/talbot-lab-data/Katies_data/Amplicon_Sequence_Cleaning/",
               help="path to function script directory, [default = %default]",
               metavar="script_directory"),
-  make_option(c("-t", "--threshold"), type="numeric", default=NA, 
+  make_option(c("-t", "--threshold"), type="character", default=NA, 
               help="a .csv file that has two columns: sample_type (which matches the sample types (not including negative controls) in the metadata file) and threshold (defines the minimum number of reads needed for a sample to be kept for downstream analysis) [default= %default]",
               metavar="threshold"),
   make_option(c("-o", "--outliers"), type="character", default=NA,
@@ -60,11 +55,11 @@ if (!is.na(opt$metadata)) {
 }
 if (!is.na(opt$threshold)) {
   threshold_path <- opt$threshold
-  thresholds <- read.csv(threshold_path)
+  thresholds <- vroom::vroom(threshold_path)
 } else {
   stop("Path to threshold file must be provided. See script usage (--help)")
 }
-if (!is.na(opt$threshold)) {
+if (!is.na(opt$outliers)) {
   outliers_path <- opt$outliers
   outliers <- readLines(outliers_path, warn = FALSE)
 } else {
@@ -133,6 +128,11 @@ for(i in 1:length(types)){
                                    "_phyloseq_filteredsamples_withnc", date, 
                                    ".RDS"))
   
+  # plot histogram of post-filtering sequencing depth
+  setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon, 
+               "/Figures/", types[i]))
+  plot_filter_seq_depth(sample_metadata, types[i], threshold, date)
+  
   if(edit_metadata == "Y"){
     for(i in 1:nrow(metadata)){
       if(metadata$sample_type == types[i] & metadata$seq_count_dada2 < threshold){
@@ -142,4 +142,12 @@ for(i in 1:length(types)){
   }
 }
 
-print("Done with all sample types. Check the saved figures to see if you have any remaining outliers and/or if the one of the drop thresholds you tested is okay. I'd suggest testing 2+ drop thresholds!")
+if(edit_metadata == "Y"){
+  setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon))
+  metadata_file_name <- basename(metadata_path)
+  new_metadata_file_name <- sub("_\\d{8}\\.csv$", paste0(date, ".csv"), 
+                                metadata_file_name)
+  write.csv(metadata, new_metadata_file_name)
+}
+
+print("Done with all sample types.")
