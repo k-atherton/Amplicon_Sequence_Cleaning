@@ -91,6 +91,7 @@ To run this script, adjust the inputs for each respective flag within the script
     - **Make this file yourself**
 - Outputs:
   - Figure: NMDS of the samples where the points are the sample names to ID outliers, after the previously identified outliers were removed. Use this to see if you missed any outliers.
+  - Figure: multipanel NMDS of the data structure after removing outliers, coloring the samples by different variables.
   - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold1, coloring the samples by different variables.
   - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold2, coloring the samples by different variables.
     - The main thing you're looking for here is that there isn't a significant restructuring of your data before/after dropping samples. Based on these NMDS figures, decide which threshold to go with. The bash output will list the number of samples and names of samples dropped for each threshold. Use that to determine if too many samples total or if too many samples from one treatment were dropped by either threshold in order to make your decision. 
