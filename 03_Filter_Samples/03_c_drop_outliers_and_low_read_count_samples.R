@@ -4,6 +4,7 @@ library(optparse)
 library(vroom)
 library(phyloseq)
 library(ggplot2)
+library(readr)
 
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
@@ -73,19 +74,12 @@ source("00_functions.R")
 # Read in metadata
 print("Reading in metadata file...")
 metadata <- read_csv(metadata_path)
-if(edit_metadata == "Y"){
-  metadata$sequences_dropped <- "No"
-  for(i in 1:nrow(metadata)){
-    if(metadata$sample_data[i] %in% outliers){
-      metadata$sequences_dropped <- "Outlier"
-    }
-  }
-}
 
 # get sample types
 types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
 print("Sample types:")
 print(types)
+
 for(i in 1:length(types)){
   print(paste0("Processing ", types[i], " samples"))
   
@@ -134,19 +128,32 @@ for(i in 1:length(types)){
   plot_filter_seq_depth(sample_metadata, types[i], threshold, date)
   
   if(edit_metadata == "Y"){
-    for(i in 1:nrow(metadata)){
-      if(metadata$sample_type == types[i] & metadata$seq_count_dada2 < threshold){
-        metadata$sequences_dropped <- "Low read count"
-      }
-    }
+    metadata$sequences_dropped <- "No"
+    metadata$sequences_dropped <- ifelse(
+      metadata$sample_type == types[i] & !is.na(metadata$seq_count_dada2) & as.numeric(metadata$seq_count_dada2) < as.numeric(threshold),
+        "Low read count",
+        metadata$sequences_dropped)
   }
 }
 
 if(edit_metadata == "Y"){
-  setwd(paste0(pwd, "02_Clean_Data/03_Filter_Samples_ASV_Tables/", amplicon))
-  metadata_file_name <- basename(metadata_path)
-  new_metadata_file_name <- sub("_\\d{8}\\.csv$", paste0(date, ".csv"), 
-                                metadata_file_name)
+    metadata$sequences_dropped <- ifelse(
+      metadata$sample_name %in% outliers,
+      "Outlier",
+      metadata$sequences_dropped
+    )
+    metadata$sequences_dropped <- ifelse(
+      is.na(metadata$sample_name),
+      "No sequence data",
+      metadata$sequences_dropped
+    )
+    metadata$sequences_dropped <- ifelse(
+      metadata$is_control == TRUE,
+      "Negative Control",
+      metadata$sequences_dropped
+    )
+  new_metadata_file_name <- sub("_\\d{8}\\.csv$", paste0("_dropsamples", date, 
+                                                         ".csv"), metadata_path)
   write.csv(metadata, new_metadata_file_name)
 }
 

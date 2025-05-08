@@ -12,7 +12,6 @@ library(readr)
 ### SCRIPT SETUP ##############################################################
 print("SETTING UP SCRIPT:")
 date <- format(Sys.Date(),"_%Y%m%d")
-pwd <- "/projectnb/talbot-lab-data/Katies_data/M-BUDS/"
 
 option_list = list(
   make_option(c("-a", "--amplicon"), type="character", default="16S", 
@@ -32,7 +31,10 @@ option_list = list(
               metavar="script_directory"),
   make_option(c("-v", "--variables"), type="character", default=NA, 
               help="text file with list of varibles to color data by for NMDS plots",
-              metavar="variables")
+              metavar="variables"),
+  make_option(c("-e", "--edit"), type="character", default="N", 
+              help="do you want to edit the metadata file? options: Y or N [default= %default]", 
+              metavar="edit_metadata")
 )
 
 opt_parser = OptionParser(option_list=option_list)

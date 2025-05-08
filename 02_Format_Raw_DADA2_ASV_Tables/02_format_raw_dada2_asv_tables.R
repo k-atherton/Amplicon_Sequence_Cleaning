@@ -189,9 +189,9 @@ if(edit_metadata %in% c("Y", "y")){
   }
   
   # write this data to the file
-  write.csv(metadata, paste0(getwd(), "/", yourname, "_", amplicon, 
-                             "_sample_metadata", date, ".csv"),
-            row.names = FALSE)
+  new_metadata_file_name <- sub("_\\d{8}\\.csv$", paste0("_dada2", date, 
+                                                         ".csv"), metadata_path)
+  write.csv(metadata, new_metadata_file_name, row.names = FALSE)
 }
 
 ### SEPARATE ASV TABLE BY SAMPLE TYPE #########################################

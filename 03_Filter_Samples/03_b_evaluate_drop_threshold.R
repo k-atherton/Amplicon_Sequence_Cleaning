@@ -93,14 +93,6 @@ types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
 print("Sample types:")
 print(types)
 
-if("Soil" %in% types){
-  metadata$sample_type <- paste0(metadata$soil_horizon, metadata$sample_type)
-  metadata$sample_type <- gsub("NALeaf", "Leaf", metadata$sample_type)
-  metadata$sample_type <- gsub(".*Root", "Root", metadata$sample_type)
-  types <- unique(metadata$sample_type[which(metadata$is_control == FALSE)])
-  print(types)
-}
-
 for(i in 1:length(types)){
   print(paste0("Processing ", types[i], " samples"))
   

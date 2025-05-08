@@ -455,8 +455,8 @@ plot_filter_seq_depth <- function(metadata, sample_type, threshold, date){
                linetype="dashed") +
     labs(x = "Read count after DADA2", y = "count", fill = "Sequencing batch")
   
-  ggsave(paste0(sample_type, "/", yourname, "_", amplicon, "_", sample_type, 
-                "_sequencing_depth_filtered_drop", proposed_threshold, date,
+  ggsave(paste0(yourname, "_", amplicon, "_", sample_type, 
+                "_sequencing_depth_filtered_drop", threshold, date,
                 ".png"), width = 9, height = 5, units = "in", dpi = 300)
 }
 
