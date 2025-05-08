@@ -1,0 +1,5 @@
+sequencing_batch
+tree_age
+tree_pit_type
+tree_species
+site_name
