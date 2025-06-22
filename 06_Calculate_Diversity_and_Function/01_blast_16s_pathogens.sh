@@ -44,6 +44,10 @@ echo "Removing duplicated representative sequences."
 module load seqkit
 seqkit rmdup -s < $project_dir/02_Clean_Data/06_Calculate_Diversity_and_Function/16s_representative_sequences_with_duplicates.fasta > $project_dir/02_Clean_Data/06_Calculate_Diversity_and_Function/16s_representative_sequences_unique.fasta
 
+# Unzip the MBPD pathogen database. 
+echo "Unzipping the MBPD database."
+unzip $project_dir/00_Databases/pathogen.fasta -d $project_dir/00_Databases/
+
 # BLAST against the Multiple Bacterial Pathogen Database
 echo "BLASTing against the pathogen database."
 module load blast+
