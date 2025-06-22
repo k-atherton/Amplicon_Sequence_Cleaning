@@ -46,13 +46,13 @@ seqkit rmdup -s < $project_dir/02_Clean_Data/06_Calculate_Diversity_and_Function
 
 # Unzip the MBPD pathogen database. 
 echo "Unzipping the MBPD database."
-unzip $project_dir/00_Databases/pathogen.fasta -d $project_dir/00_Databases/
+unzip $script_dir/00_Databases/pathogen.fasta -d $script_dir/00_Databases/
 
 # BLAST against the Multiple Bacterial Pathogen Database
 echo "BLASTing against the pathogen database."
 module load blast+
 blastn -query $project_dir/02_Clean_Data/06_Calculate_Diversity_and_Function/16s_representative_sequences_unique.fasta\
-	-db $project_dir/00_Databases/pathogen.fasta \
+	-db $script_dir/00_Databases/pathogen.fasta \
 	-perc_identity 95 \
 	-qcov_hsp_perc 100 \
 	-outfmt 7 \
