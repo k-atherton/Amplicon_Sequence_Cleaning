@@ -44,7 +44,6 @@ opt = parse_args(opt_parser)
 
 amplicon <- opt$amplicon
 yourname <- opt$name
-edit_metadata <- opt$edit
 if(endsWith(opt$pwd, "/")){
   pwd <- opt$pwd
 } else{
@@ -138,7 +137,7 @@ if(amplicon == "16S"){
     guild_abund[[i]] <- record_16s_guild_abund(perc_data_guild[[i]])
   }
   if(length(perc_data_guild) > 1){
-    result <- bind_rows(perc_data_guild, .id = "column_label")
+    result <- bind_rows(list(guild_abund))
   } else{
     result <- guild_abund[[1]]
   }
@@ -170,7 +169,7 @@ if(amplicon == "16S"){
                                                perc_data[[i]], taxonomy)
   }
   if(length(guild_abund) > 1){
-    result <- bind_rows(guild_abund, .id = "column_label")
+    result <- bind_rows(list(guild_abund))
   } else{
     result <- guild_abund[[1]]
   }
@@ -223,7 +222,7 @@ if(amplicon == "16S"){
     pathogen_abund[[i]] <- record_16s_pathogen_abund(perc_data_pathogen[[i]])
   }
   if(length(perc_data_pathogen) > 1){
-    result <- bind_rows(perc_data_pathogen, .id = "column_label")
+    result <- bind_rows(list(pathogen_abund))
   } else{
     result <- pathogen_abund[[1]]
   }
