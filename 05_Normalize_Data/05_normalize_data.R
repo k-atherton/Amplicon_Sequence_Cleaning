@@ -233,9 +233,6 @@ if(aitchison_transform == "Y"){
   }
   if(length(types) > 1 & bc == "Y"){
     print(paste0("Reading in all data types:"))
-    setwd(paste0(pwd, "02_Clean_Data/04_Decontaminate_Samples/", amplicon))
-    ps_all <- read_in_file(getwd(), paste0(yourname, "_", amplicon, 
-                                           "_alldatatypes_decontam_"), ".RDS")
     print("CALCULATING AITCHISON DISTANCE MATRIX FOR DATA:")
     setwd(paste0(pwd, "02_Clean_Data/05_Transform_Data/", amplicon, 
                  "/Aitchison_Distance_Tables"))

@@ -652,14 +652,15 @@ check_batch_effect <- function(ps, amplicon, yourname, date, variables){
   })
   
   print("Calculating NMDS for visualization purposes.")
-  all.MDS <- metaMDS(aitch, k=2, zerodist="add")
-  coordinates <- data.frame(scores(all.MDS))
+  all.MDS <- metaMDS(aitch, k=2, zerodist="add", trymax = 100)
+  
+  coordinates <- as.data.frame(all.MDS$points)
   coordinates <- cbind(coordinates, metadata)
   
   # plot samples by different variables
   print("Plotting samples by different variables.")
   plot_list <- lapply(variables, function(var) {
-    ggplot(coordinates, aes_string(x = "NMDS1", y = "NMDS2", col = var)) +
+    ggplot(coordinates, aes_string(x = "MDS1", y = "MDS2", col = var)) +
       geom_point() +
       stat_ellipse() +
       theme_bw() +
@@ -694,12 +695,10 @@ batch_correct <- function(ps, amplicon, yourname, date, batch, covars){
   # keep metadata samples which are still in the asv table
   print("Keeping metadata samples that are still in ASV table.")
   metadata <- metadata[which(rownames(metadata) %in% colnames(asv_table)),]
-  if(amplicon == "16S"){
-    print("16S: Removing leaf samples from batch control -- too few reads.")
+    print("Removing leaf samples from batch control -- too few reads.")
     metadata <- metadata[which(metadata$sample_type != "Leaf"),]
     asv_table <- asv_table[,which(colnames(asv_table) %in% rownames(metadata))]
     asv_table <- asv_table[,order(colnames(asv_table))]
-  }
   
   # order the metadata by sample name
   print("Ordering the metadata by sample name (same as the ASV table)")
@@ -723,8 +722,14 @@ batch_correct <- function(ps, amplicon, yourname, date, batch, covars){
     # batch correct with ComBat_seq
     print(paste0("Defining covariates that should maintain data signature after batch control: ", covars))
     covar_mod <- as.data.frame(metadata[,which(colnames(metadata) %in% covars)])
+    if(storage.mode(asv_table) == "double"){
+      asv_table <- round(asv_table)
+      storage.mode(asv_table) <- "integer"
+    }
+    batch_variable <- as.factor(batch_variable)
     print("Running batch control.")
-    batch_corrected <- ComBat_seq(asv_table, batch_variable, group=NULL, covar_mod)
+    batch_corrected <- ComBat_seq(counts = asv_table, batch = batch_variable, 
+                                  group=NULL, covar_mod = covar_mod)
   } else if(!is.na(covars)){
     print(paste0("Defining covariates that should maintain data signature after batch control: ", covars))
     covar_mod <- factor(metadata[,which(colnames(metadata) %in% covars)])
@@ -764,7 +769,12 @@ rarefy_data <- function(ps, sample_type, amplicon, yourname, date, threshold){
   print("Extracting ASV table from phyloseq object.")
   pre_rare_asv <- as.data.frame(as.matrix(ps@otu_table))
   
+  # Save the threshold as the minimum of the sample sums IF either a threshold 
+  # isn't set or if the threshold set is less than the minimum of the sample
+  # sums
   if(is.na(threshold)){
+    threshold <- min(sample_sums(ps))
+  } else if(threshold < min(sample_sums(ps))){
     threshold <- min(sample_sums(ps))
   }
   
@@ -868,9 +878,14 @@ zscore_data <- function(ps, sample_type, amplicon, yourname, date){
 
 aitchison_data <- function(ps, sample_type, amplicon, yourname, date){
   print(sample_type)
-  # extract the ASV table
-  print("Extracting the ASV table.")
-  asv_table <- as.data.frame(as.matrix(ps@otu_table))
+  
+  if(class(ps)[[1]]=="phyloseq"){
+    # extract the ASV table
+    print("Extracting the ASV table.")
+    asv_table <- as.data.frame(as.matrix(ps@otu_table))
+  } else{
+    asv_table <- ps
+  }
   
   # calculate Aitchison distance matrix
   print("Calculating Aitchison's distance matrix for data.")
@@ -891,8 +906,8 @@ aggregate_guilds_16S <- function(seq_data, perc_data, taxonomy){
                      by.y = "ASV_ID", all.x = TRUE)
   
   # keep the data we need for aggregating
-  perc_data <- perc_data[,c(2:(ncol(seq_data)+1), 
-                            (ncol(seq_data) + ncol(taxonomy)))]
+  pd <- perc_data[,c(2:(ncol(seq_data)+1))]
+  pd$guild <- perc_data$guild
   
   # aggregate by guild
   perc_data_guild <- aggregate(.~guild, perc_data, FUN = "sum", na.rm = F)

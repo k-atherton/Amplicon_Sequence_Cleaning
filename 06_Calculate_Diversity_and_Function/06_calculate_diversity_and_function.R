@@ -36,7 +36,7 @@ option_list = list(
   make_option(c("-t", "--taxonomy"), type="character", default=NA,
               help="path to taxonomy file", metavar="taxonomy"),
   make_option(c("--pathogen16s"), type = "character", default = NA,
-              help="path to MBPD BLAST results", metavar = "pathogens")
+              help="path to MBPD BLAST results", metavar = "pathogen16s")
   )
 
 opt_parser = OptionParser(option_list=option_list)
@@ -68,8 +68,8 @@ if (!is.na(opt$taxonomy)) {
   stop("Path to taxonomy file must be provided. See script usage (--help)")
 }
 if(amplicon == "16S"){
-  if(!is.na(opt$pathogens)) {
-    pathogens_path <- opt$pathogens
+  if(!is.na(opt$pathogen16s)) {
+    pathogens_path <- opt$pathogen16s
   } else {
     stop("Path to MBPD BLAST results file must be provided. See script usage (--help)")
   } 
@@ -91,7 +91,7 @@ sample_types <- sample_types[which(sample_types != "Negative Control")]
 print("Reading in rarefied sequence data files...")
 seq_data <- vector(mode = "list", length = length(sample_types))
 for(i in 1:length(seq_data)){
-  print(paste0("Reading in ", sample_types[i], "sequence data."))
+  print(paste0("Reading in ", sample_types[i], " sequence data."))
   seq_data_ps <- read_in_file(rarefied_data_path, 
                               paste0(yourname, "_", amplicon, "_", 
                                      sample_types[i], "_rarefied_phyloseq_"), 
