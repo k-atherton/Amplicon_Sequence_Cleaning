@@ -204,7 +204,7 @@ if(amplicon == "16S"){
   
   print("Reading in pathogens database taxonomy file.")
   pathogens_tax <- vroom::vroom(paste0(script_dir, 
-                                       "00_Databases/pathogen_tax.txt"))
+                                       "/00_Databases/pathogen_tax.txt"))
   
   taxonomy <- process_16s_pathogens(pathogens_file, pathogens_tax, taxonomy)
   
@@ -271,12 +271,12 @@ for(i in 1:length(sample_types)){
   fisher <- fisher.alpha(seq_t)
   
   # merging all diversity metrics together
-  diversity[[i]] <- cbind(shannon, simpson, invsimpson, fisher)
+  diversity[[i]] <- as.data.frame(cbind(shannon, simpson, invsimpson, fisher))
 }
 
 # make one diversity dataframe 
 if(length(sample_types) > 1){
-  diversity <- bind_rows(diversity, .id = "column_label")
+  diversity <- bind_rows(list(diversity))
 } else{
   diversity <- as.data.frame(diversity[[i]])
 }

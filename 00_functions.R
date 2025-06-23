@@ -910,7 +910,7 @@ aggregate_guilds_16S <- function(seq_data, perc_data, taxonomy){
   pd$guild <- perc_data$guild
   
   # aggregate by guild
-  perc_data_guild <- aggregate(.~guild, perc_data, FUN = "sum", na.rm = F)
+  perc_data_guild <- aggregate(.~guild, pd, FUN = "sum", na.rm = F)
   return(perc_data_guild)
 }
 
