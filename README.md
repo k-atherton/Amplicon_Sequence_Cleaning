@@ -20,7 +20,7 @@ To run this pipeline, you will need the following R packages (in parentheses are
 - vroom (v1.6.3)
 
 ## Workflow
-### STEP 1: Run DADA2
+### Step 1: Run DADA2
 **Filename: `01_DADA2/01_bu16s_example_inputs.sh`**
 - Required inputs:
   - project name + run ID (example: M-BUDS_Run1)
@@ -135,3 +135,23 @@ To run this script, adjust the inputs for each respective flag within the script
   - File: Table of the taxonomy of the ASVs removed as contaminants (csv, one per sequencing run)
   - If -e flag == Y: File: metadata table with new column "decontam_seq_count". Contains the summed read counts for samples after decontam.
 
+## Step 5: Normalize Data
+**Filename: `05_Normalize_Data/05_normalize_data.R`**
+- Required inputs:
+  - Amplicon type (flag: -a or --amplicon): amplicon type of the dataset; options: 16S or ITS [default = 16S]
+  - Last name (flag: -n or --name): your last name for output file naming scheme [default = atherton]
+  - Edit metadata file (flag: -e or --edit): Do you want to make edits to the metadata file; options: Y or N [default = N]
+  - Working directory (flag: -p or --pwd): Directory for saving the outputs of the script [default is the result of the function getwd() in R]
+  - Metadata file (flag: -m or --metadata): the file should be a .csv and have a column name called sample_type, which defines the sample types (e.g. "leaf", "negative control", "soil", etc.).
+  - Script directory (flag: -s or --scriptdir): path to the function script directory where the 00_functions.R script is held
+  - Batch correction (flag: -b or --batchcorrect): Do you want to check for a batch effect and correct for a batch effect, if the check recommends it?; options: Y or N [default = N]
+  - Rarefaction (flag: -r or --rarefy): Do you want to rarefy your data?; options: Y or N [default = N]
+  - Rarefaction threshold (flag -t or --threshold): the minimum threshold to rarefy to. Remove if you are not rarefying, or if you want to use the default of the minimum of the sample read sums.
+  - CLR transformation (flag -l or --clrtransform): Do you want to CLR transform your data?; options: Y or N [default = N]
+  - Z-Score transformation (flag -z or --ztransform): Do you want to Z-Score transform your data?; options: Y or N [default = N]
+  - Aitchison Distance calculation (flag -d or --aitchison): Do you want to calculate the Aitchison Distance Matrix for your data?; options: Y or N [default = N]
+  - Batch Correction Variables: path to text file with variables you want to color by in your batch correction plots. One variable per line. Only include if you use -b "Y".
+  - Variable to Batch Correct by (flag --batchvariable): Column name of the variable that you want to check for a batch effect with. Only include if you use -b "Y".
+  - Batch Correction Covariates (flag --covariates): Path to text file with variables to maintain the signature of in batch correction. Only include if you use -b "Y". 
+- Outputs:
+  - 
