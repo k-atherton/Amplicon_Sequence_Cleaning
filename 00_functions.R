@@ -1006,13 +1006,13 @@ record_16s_guild_abund <- function(perc_data_guild){
   colnames(perc_sulfonate_desulfurization)[1] <- "perc_sulfonate_desulfurization"
   
   # Phosphate solubilization
-  rows <- grep("foliar_endophyte", rownames(data))
+  rows <- grep("Phosphate solubilization", rownames(data))
   subset <- data[rows,]
   perc_phosphate_solubilization <- data.frame(colSums(subset))
   colnames(perc_phosphate_solubilization)[1] <- "perc_phosphate_solubilization"
   
   # Other N-cycling
-  rows <- grep("lichen_parasite", rownames(data)) 
+  rows <- grep("Other N-cycling", rownames(data)) 
   subset <- data[rows,]
   perc_other_n_cycling <- data.frame(colSums(subset))
   colnames(perc_other_n_cycling)[1] <- "perc_other_n_cycling"
@@ -1067,25 +1067,25 @@ record_its_guild_abund <- function(perc_data_guild, perc_data, taxonomy){
   data <- perc_data_guild
   rownames(data) <- data$primary_lifestyle
   data <- data[,-1]
-  
+
   # Algal Ectosymbiont
   rows <- grep("algal_ectosymbiont", rownames(data)) 
   subset <- data[rows,]
   algal_ecto <- data.frame(colSums(subset))
-  colnames(algal_ecto)[1] <- "algal_ecto"
+  colnames(algal_ecto)[1] <- "perc_algal_ectosymbiont"
   
   # Algal Parasite
   rows <- grep("algal_parasite", rownames(data)) 
   subset <- data[rows,]
   algal_para <- data.frame(colSums(subset))
-  colnames(algal_para)[1] <- "algal_para"
+  colnames(algal_para)[1] <- "perc_algal_parasite"
   
   # Algivorous/Protistivorous
   rows <- grep("algivorous/protistivorous", rownames(data)) 
   subset <- data[rows,]
   algivorous <- data.frame(colSums(subset))
-  colnames(algivorous)[1] <- "algivorous"
-  
+  colnames(algivorous)[1] <- "perc_algivorous_protistivorous"
+
   # Animal Parasite
   animal_cap <- merge(perc_data, taxonomy, by.x = 0, by.y = "ASV_ID")
   rownames(animal_cap) <- animal_cap[,1]
@@ -1098,110 +1098,109 @@ record_its_guild_abund <- function(perc_data_guild, perc_data, taxonomy){
   subset <- animal_cap[rows,]
   subset <- subset[,-ncol(subset)]
   animal_parasite <- data.frame(colSums(subset))
-  colnames(animal_parasite) [1] <- "Animal_parasite"
-  
+  colnames(animal_parasite) [1] <- "perc_animal_parasite"
   rows <- grep(paste(c("animal_parasite", "animal-associated"), collapse="|"), 
                 animal_cap$Animal_biotrophic_capacity_template)
   subset <- animal_cap[rows,]
   subset <- subset[,-ncol(subset)]
   animal_pathogen <- data.frame(colSums(subset))
-  colnames(animal_pathogen) [1] <- "Animal_associated_pathogen"
+  colnames(animal_pathogen) [1] <- "perc_animal_associated_pathogen"
   
   rows <- grep(c("animal_endosymbiont"), animal_cap$Animal_biotrophic_capacity_template)
   subset <- animal_cap[rows,]
   subset <- subset[,-ncol(subset)]
   animal_endosymbiont <- data.frame(colSums(subset))
-  colnames(animal_endosymbiont) [1] <- "Animal_endosymbiont"
+  colnames(animal_endosymbiont) [1] <- "perc_animal_endosymbiont"
   
   rows <- grep("human", animal_cap$Animal_biotrophic_capacity_template)
   subset <- animal_cap[rows,]
   subset <- subset[,-ncol(subset)]
   human_pathogen <- data.frame(colSums(subset))
-  colnames(human_pathogen) [1] <- "Human_pathogen"
+  colnames(human_pathogen) [1] <- "perc_human_pathogen"
   
   rows <- grep("opportunistic", animal_cap$Animal_biotrophic_capacity_template)
   subset <- animal_cap[rows,]
   subset <- subset[,-ncol(subset)]
   opportunistic_pathogen <- data.frame(colSums(subset))
-  colnames(opportunistic_pathogen) [1] <- "Opportunistic_pathogen"
+  colnames(opportunistic_pathogen) [1] <- "perc_opportunistic_pathogen"
   
   # Arbuscular Mycorrhizal
   rows <- grep("arbuscular_mycorrhizal", rownames(data)) 
   subset <- data[rows,]
   amf <- data.frame(colSums(subset))
-  colnames(amf)[1] <- "amf"
+  colnames(amf)[1] <- "perc_arbuscular_mycorrhizal"
   
   # Arthropod Associated
   rows <- grep("arthropod-associated", rownames(data)) 
   subset <- data[rows,]
   arthropod <- data.frame(colSums(subset))
-  colnames(arthropod)[1] <- "arthropod"
+  colnames(arthropod)[1] <- "perc_arthropod_associated"
   
   # Bacterivorous
   rows <- grep("bacterivorous", rownames(data)) 
   subset <- data[rows,]
   bacterivorous <- data.frame(colSums(subset))
-  colnames(bacterivorous)[1] <- "bacterivorous"
+  colnames(bacterivorous)[1] <- "perc_bacterivorous"
   
   # Dung Saprotroph
   rows <- grep("dung_saprotroph", rownames(data)) 
   subset <- data[rows,]
   dung <- data.frame(colSums(subset))
-  colnames(dung)[1] <- "dung_sap"
+  colnames(dung)[1] <- "perc_dung_saprotroph"
   
   # ECM
   rows <- grep("ectomycorrhizal", rownames(data)) 
   subset <- data[rows,]
   ECM <- data.frame(colSums(subset))
-  colnames(ECM)[1] <- "ECM"
+  colnames(ECM)[1] <- "perc_ectomycorrhizal"
   
   # Epiphyte
   rows <- grep("epiphyte", rownames(data)) 
   subset <- data[rows,]
   epiphyte <- data.frame(colSums(subset))
-  colnames(epiphyte)[1] <- "epiphyte"
+  colnames(epiphyte)[1] <- "perc_epiphyte"
   
   # Foliar Endophyte
   rows <- grep("foliar_endophyte", rownames(data))
   subset <- data[rows,]
   foliar <- data.frame(colSums(subset))
-  colnames(foliar)[1] <- "foliar_endophyte"
+  colnames(foliar)[1] <- "perc_foliar_endophyte"
   
   # Lichen Parasite
   rows <- grep("lichen_parasite", rownames(data)) 
   subset <- data[rows,]
   lichen_parasite <- data.frame(colSums(subset))
-  colnames(lichen_parasite)[1] <- "lichen_parasite"
+  colnames(lichen_parasite)[1] <- "perc_lichen_parasite"
   
   # Lichenized
   rows <- grep("lichenized", rownames(data)) 
   subset <- data[rows,]
   lichenized <- data.frame(colSums(subset))
-  colnames(lichenized)[1] <- "lichenized"
+  colnames(lichenized)[1] <- "perc_lichenized"
   
   # Litter Saprotroph
   rows <- grep("litter_saprotroph", rownames(data)) 
   subset <- data[rows,]
   litter_sap <- data.frame(colSums(subset))
-  colnames(litter_sap)[1] <- "litter_sap"
+  colnames(litter_sap)[1] <- "perc_litter_saprotroph"
   
   # Moss Symbiont
   rows <- grep("moss_symbiont", rownames(data)) 
   subset <- data[rows,]
   moss_symb <- data.frame(colSums(subset))
-  colnames(moss_symb)[1] <- "moss_symb"
+  colnames(moss_symb)[1] <- "perc_moss_symbiont"
   
   # Mycoparasite
   rows <- grep("mycoparasite", rownames(data)) 
   subset <- data[rows,]
   mycoparasite <- data.frame(colSums(subset))
-  colnames(mycoparasite)[1] <- "mycoparasite"
+  colnames(mycoparasite)[1] <- "perc_mycoparasite"
   
   # Nectar/Tap Saprotroph
   rows <- grep("nectar/tap_saprotroph", rownames(data)) 
   subset <- data[rows,]
   nectar_sap <- data.frame(colSums(subset))
-  colnames(nectar_sap)[1] <- "nectar_sap"
+  colnames(nectar_sap)[1] <- "perc_nectar_tap_saprotroph"
   
   # Plant Pathogen
   plant_cap <- merge(perc_data, taxonomy, by.x = 0, by.y = "ASV_ID")
@@ -1213,79 +1212,79 @@ record_its_guild_abund <- function(perc_data_guild, perc_data, taxonomy){
   plant_path_cap <- na.omit(plant_path_cap)
   subset <- plant_path_cap[,-ncol(plant_path_cap)]
   Plant_pathogenic_capacity <- data.frame(colSums (subset))
-  colnames(Plant_pathogenic_capacity) [1] <- "Plant_pathogenic_capacity"
+  colnames(Plant_pathogenic_capacity) [1] <- "perc_plant_pathogen"
   
   rows <- grep("root", plant_path_cap$Plant_pathogenic_capacity_template)
   subset <- plant_path_cap[rows,]
   subset <- subset[,-ncol(subset)]
   root_pathogen <- data.frame(colSums(subset))
-  colnames(root_pathogen) [1] <- "Root_associated_pathogen"
+  colnames(root_pathogen) [1] <- "perc_root_associated_pathogen"
   
   rows <- grep("leaf", plant_path_cap$Plant_pathogenic_capacity_template)
   subset <- plant_path_cap[rows,]
   subset <- subset[,-ncol(subset)]
   leaf_pathogen <- data.frame(colSums(subset))
-  colnames(leaf_pathogen) [1] <- "Leaf_fruit_seed_pathogen"
+  colnames(leaf_pathogen) [1] <- "perc_leaf_fruit_seed_pathogen"
   
   rows <- grep("wood", plant_path_cap$Plant_pathogenic_capacity_template)
   subset <- plant_path_cap[rows,]
   subset <- subset[,-ncol(subset)]
   wood_pathogen <- data.frame(colSums(subset))
-  colnames(wood_pathogen) [1] <- "Wood_pathogen"
+  colnames(wood_pathogen) [1] <- "perc_wood_pathogen"
   
   # Pollen Saprotroph
   rows <- grep("pollen_saprotroph", rownames(data)) 
   subset <- data[rows,]
   pollen_sap <- data.frame(colSums(subset))
-  colnames(pollen_sap)[1] <- "pollen_sap"
+  colnames(pollen_sap)[1] <- "perc_pollen_saprotroph"
   
   # Protistan Parasite
   rows <- grep("protistan_parasite", rownames(data)) 
   subset <- data[rows,]
   protistan <- data.frame(colSums(subset))
-  colnames(protistan)[1] <- "protistan"
+  colnames(protistan)[1] <- "perc_protistan_parasite"
   
   # Root Endophyte
   rows <- grep("root_endophyte", rownames(data)) 
   subset <- data[rows,]
   root_endo <- data.frame(colSums(subset))
-  colnames(root_endo)[1] <- "root_endo"
+  colnames(root_endo)[1] <- "perc_root_endophyte"
   
   # Soil Sapotroph
   rows <- grep("soil_saprotroph", rownames(data)) 
   subset <- data[rows,]
   soil_sap <- data.frame(colSums(subset))
-  colnames(soil_sap)[1] <- "soil_sap"
+  colnames(soil_sap)[1] <- "perc_soil_saprotroph"
   
   # Sooty Mold
   rows <- grep("sooty_mold", rownames(data)) 
   subset <- data[rows,]
   sooty_mold <- data.frame(colSums(subset))
-  colnames(sooty_mold)[1] <- "sooty_mold"
+  colnames(sooty_mold)[1] <- "perc_sooty_mold"
   
   # Wood Saprotroph
   rows <- grep("wood_saprotroph", rownames(data)) 
   subset <- data[rows,]
   wood_sap <- data.frame(colSums(subset))
-  colnames(wood_sap)[1] <- "wood_sap"
+  colnames(wood_sap)[1] <- "perc_wood_saprotroph"
   
   # Saprotroph
   rows <- grep("saprotroph", rownames(data)) 
   subset <- data[rows,]
   saps_all <- data.frame(colSums(subset))
-  colnames(saps_all)[1] <- "saps_all"
+  colnames(saps_all)[1] <- "perc_saprotroph_all"
   
   # Pathogens
   rows <- grep("patho", rownames(data)) 
   subset <- data[rows,]
   pathos_all <- data.frame(colSums(subset))
-  colnames(pathos_all)[1] <- "pathos_all"
+  colnames(pathos_all)[1] <- "perc_pathotroph_all"
   
   # Symbionts 
   rows <- grep(c("symbio"), rownames(data))
   subset <- data[rows,]
-  symbionts_all <- data.frame(colSums(subset)) + animal_endosymbiont$Animal_endosymbiont
-  colnames(symbionts_all)[1] <- "symbionts_all"
+  symbionts_all <- data.frame(colSums(subset)) + animal_endosymbiont$perc_animal_endosymbiont
+  colnames(symbionts_all)[1] <- "perc_symbiont_all"
   
   result <- cbind(algal_ecto, algal_para, algivorous, animal_endosymbiont, 
                   animal_parasite, amf, arthropod, bacterivorous, dung, 
