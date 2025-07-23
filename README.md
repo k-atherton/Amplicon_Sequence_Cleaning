@@ -116,3 +116,22 @@ To run this script, adjust the inputs for each respective flag within the script
   - File: ASV table without dropped samples, including negative controls (phyloseq RDS)
   - If -e flag == Y: File: metadata table with new column "sequences_dropped". Containes values "No" for samples kept for downstream analysis, "Outlier" for samples identified as outliers in steps 3a, or "Low read count" for samples dropped because they have a read count < threshold.
 
+
+## Step 4: Decontaminate ASV Tables
+**Filename: `04_Decontam_ASV_Tables/04_decontaminate_samples.R`**
+- Required inputs:
+  - Amplicon type (flag: -a or --amplicon): amplicon type of the dataset; options: 16S or ITS [default = 16S]
+  - Last name (flag: -n or --name): your last name for output file naming scheme [default = atherton]
+  - Edit metadata file (flag: -e or --edit): Do you want to make edits to the metadata file; options: Y or N [default = N]
+  - Working directory (flag: -p or --pwd): Directory for saving the outputs of the script [default is the result of the function getwd() in R]
+  - Metadata file (flag: -m or --metadata): the file should be a .csv and have a column name called sample_type, which defines the sample types (e.g. "leaf", "negative control", "soil", etc.) and a column name called sequencing_batch, which defines the sequencing batches. The metadata file should also have a column called is_control with values TRUE (in rows for negative controls) or FALSE (in rows for samples).
+  - Script directory (flag: -s or --scriptdir): path to the function script directory where the 00_functions.R script is held
+- Outputs:
+  - Figure: multipanel figure of scatterplots for each sequencing run plotting the pre-decontam sample read count vs. the rank of the read count for the sequencing run. Samples are colored by their control status.
+  - Figure (prevalence method): If you have negative controls for sequencing runs, multipanel figure of scatterplots for each sequencing run plotting the prevalence of ASVs in negative controls vs. in true samples, colored by their contaminant status.
+  - Figure (frequency method): If you don't have negative controls for sequencing runs, multipanel figure of scatterplots, showing the frequency of ASVs vs the DNA concentrations of the samples they appear in. This figure only shows plots for ASVs determined to be contaminants.
+  - Figure: histogram of sequencing depth after decontam. 
+  - File: ASV table with contaminating ASVs removed and negative control samples dropped (csv and phyloseq RDS versions)
+  - File: Table of the taxonomy of the ASVs removed as contaminants (csv, one per sequencing run)
+  - If -e flag == Y: File: metadata table with new column "decontam_seq_count". Contains the summed read counts for samples after decontam.
+
