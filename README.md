@@ -85,7 +85,7 @@ To run this script, adjust the inputs for each respective flag within the script
   - Figure: multipanel NMDS of the data structure before removing outliers, coloring the samples by different variables.
   - Figure: histogram of the sample sequencing depths before dropping any samples.
 
-To run this script, comment out lines 45-98 (put a "#" in front of each line) and adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 03_run_filter_samples.sh>`
+To run this script, comment out lines 54-128 (put a "#" in front of each line) and adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 03_run_filter_samples.sh>`
 
 ### Step 3b: Evaluate drop thresholds
 **Filename: `03_Filter_Samples/03_b_evaluate_drop_thresholds.R`**
@@ -109,7 +109,7 @@ To run this script, comment out lines 45-98 (put a "#" in front of each line) an
   - Figure: multipanel NMDS of the data structure after removing outliers and samples with a sequence count < threshold2, coloring the samples by different variables.
     - The main thing you're looking for here is that there isn't a significant restructuring of your data before/after dropping samples. Based on these NMDS figures, decide which threshold to go with. The bash output will list the number of samples and names of samples dropped for each threshold. Use that to determine if too many samples total or if too many samples from one treatment were dropped by either threshold in order to make your decision.
    
-To run this script, comment out lines 24-43 and 77-98 (put a "#" in front of each line) and adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 03_run_filter_samples.sh>`
+To run this script, comment out lines 24-52 and 92-128 (put a "#" in front of each line) and adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 03_run_filter_samples.sh>`
 
 ### Step 3c: Drop outliers and low read count samples
 **Filename: `03_Filter_Samples/03_c_drop_outliers_and_low_read_count_samples.R`**
@@ -133,7 +133,7 @@ To run this script, comment out lines 24-43 and 77-98 (put a "#" in front of eac
   - File: ASV table without dropped samples, including negative controls (phyloseq RDS)
   - If -e flag == Y: File: metadata table with new column "sequences_dropped". Containes values "No" for samples kept for downstream analysis, "Outlier" for samples identified as outliers in steps 3a, or "Low read count" for samples dropped because they have a read count < threshold.
 
-To run this script, comment out lines 24-73 (put a "#" in front of each line) and adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 03_run_filter_samples.sh>`
+To run this script, comment out lines 24-92 (put a "#" in front of each line) and adjust the inputs for each respective flag within the script and then run `qsub -P <SCC project name> -N <job name> 03_run_filter_samples.sh>`
 
 ## Step 4: Decontaminate ASV Tables
 **Filename: `04_Decontam_ASV_Tables/04_decontaminate_samples.sh`**
