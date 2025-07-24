@@ -7,9 +7,9 @@ My workflow starts after sequences have been clustered and annotated by DADA2 (I
 
 ## Requirements
 To run this pipeline, you will need the following R packages (in parentheses are the versions I used; I ran this pipeline in R version 4.3.1):
-- compositions (v.)
+- compositions (v.2.0-8)
 - dplyr (v.1.1.4)
-- geosphere (v.)
+- geosphere (v.1.5-18)
 - ggplot2 (v.3.5.1)
 - gridExtra (v.2.3)
 - optparse (v.1.7.5)
@@ -18,9 +18,9 @@ To run this pipeline, you will need the following R packages (in parentheses are
 - readr (v.2.1.4)
 - readxl (v.1.4.2)
 - robCompositions (v.2.4.1)
-- sva (v.)
-- tidyr (v.)
-- tidyverse (v.)
+- sva (v.3.48.0)
+- tidyr (v.1.3.1)
+- tidyverse (v.2.0.0)
 - vegan (v.2.6-4)
 - vroom (v1.6.3)
 
