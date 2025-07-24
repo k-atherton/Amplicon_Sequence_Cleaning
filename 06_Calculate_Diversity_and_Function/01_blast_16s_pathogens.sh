@@ -20,8 +20,8 @@ echo "Start date : $(date)"
 echo "Job name : $JOB_NAME"
 echo "=========================================================="
 
-script_dir="/projectnb/talbot-lab-data/Katies_data/Amplicon_Sequence_Cleaning"
-project_dir="/projectnb/talbot-lab-data/Katies_data/M-BUDS_ED"
+script_dir="<path to Amplicon_Sequence_Cleaning directory>"
+project_dir="path to the project directory where you want your output stored and where you have previously stored your DADA2 outputs"
 
 # To make the query file, you will need to concatenate your DADA2 representative sequences
 # files from your 16S data into one file.
