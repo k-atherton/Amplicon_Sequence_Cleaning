@@ -1,13 +1,7 @@
 #!/bin/bash -l
 
-# Set SCC project
-#$ -P microbiome
-
 # Send an email when the job finishes or if it is aborted (by default no email is sent).
 #$ -m beas
-
-# Give job a name
-#$ -N m-buds_blast_16s_pathogens
 
 # Combine output and error files into a single file
 #$ -j y
