@@ -20,21 +20,30 @@ project_dir=<path to where you want your outputs saved>
 
 echo "Running on 16S data"
 module load R/4.3.1 
+
+# Input information:
+# -a: amplicon type [options: 16S or ITS]
+# -n: your last name, used for naming output files so we know who ran the script
+# -e: do you want to edit the metadata file to add the DADA2 read count? [options: Y or N]
+# -p: path to where outputs should be saved
+# -m: path to metadata file, see documentation
+# -s: path to script directory
+
 Rscript $script_dir/04_Decontaminate_Samples/04_decontaminate_samples.R \
-	-a "16S" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-e "Y" \ # do you want to edit the metadata file to add the DADA2 read count? [options: Y or N]
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "16S" \
+	-n "atherton" \
+	-e "Y" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir
 
 echo "Running on ITS data"
 Rscript $script_dir/04_Decontaminate_Samples/04_decontaminate_samples.R \
-	-a "ITS" \ \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-e "Y" \ # do you want to edit the metadata file to add the DADA2 read count? [options: Y or N]
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "ITS" \
+	-n "atherton" \
+	-e "Y" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir
 
 echo "Done."
