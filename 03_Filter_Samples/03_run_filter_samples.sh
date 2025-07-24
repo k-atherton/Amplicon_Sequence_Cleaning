@@ -22,23 +22,32 @@ module load R/4.3.1
 # I'd recommend commenting out steps 3b and 3c the first time you run this!
 
 echo "IDENTIFY OUTLIER SAMPLES"
+
+# Input information: 
+# -a: amplicon type [options: 16S or ITS]
+# -n: your last name, used for naming output files so we know who ran the script
+# -p: path to where outputs should be saved
+# -m: path to metadata file, see documentation
+# -s: path to script directory
+# -v: path to file with list of variables to color data by for NMDS plots, see documentation
+
 echo "Running on 16S data"
 Rscript $script_dir/03_Filter_Samples/03_a_identify_outlier_samples.R \
-	-a "16S" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "16S" \
+	-n "atherton" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir \
-	-v <path to file with list of variables to color data by for NMDS plots> \ # see documentation
+	-v <path to file with list of variables to color data by for NMDS plots>
 
 echo "Running on ITS data"
 Rscript $script_dir/03_Filter_Samples/03_a_identify_outlier_samples.R \
-	-a "ITS" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "ITS" \
+	-n "atherton" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir \
-	-v <path to file with list of variables to color data by for NMDS plots> \ # see documentation
+	-v <path to file with list of variables to color data by for NMDS plots>
 
 echo "=========================================================="
 
@@ -49,26 +58,36 @@ echo "=========================================================="
 echo "EVALUATE DROP THRESHOLDS"
 echo "Running on 16S data"
 
+# Input information: 
+# -a: amplicon type [options: 16S or ITS]
+# -n: your last name, used for naming output files so we know who ran the script
+# -p: path to where outputs should be saved
+# -m: path to metadata file, see documentation
+# -s: path to script directory
+# -t: path to file with filter test thresholds table, see documentation
+# -o: path to file with outlier sample names list, see documentation
+# -v: path to file with list of variables to color data by for NMDS plots, see documentation
+
 Rscript $script_dir/03_Filter_Samples/03_b_evaluate_drop_threshold.R \
-	-a "16S" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "16S" \
+	-n "atherton" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir \
-	-t <path to file with filter test thresholds table> \ # see documentation
-	-o <path to file with outlier sample names list> \ # see documentation
-	-v <path to file with variable names list for coloring NMDS plots by> \ # see documentation
+	-t <path to file with filter test thresholds table> \
+	-o <path to file with outlier sample names list> \
+	-v <path to file with variable names list for coloring NMDS plots by>
 
 echo "Running on ITS data"
 Rscript $script_dir/03_Filter_Samples/03_b_evaluate_drop_threshold.R \
-	-a "ITS" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "ITS" \
+	-n "atherton" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir \
-	-t <path to file with filter test thresholds table> \ # see documentation
-	-o <path to file with outlier sample names list> \ # see documentation
-	-v <path to file with variable names list for coloring NMDS plots by> \ # see documentation
+	-t <path to file with filter test thresholds table> \
+	-o <path to file with outlier sample names list> \
+	-v <path to file with variable names list for coloring NMDS plots by>
 
 echo "=========================================================="
 
@@ -76,25 +95,36 @@ echo "=========================================================="
 
 echo "DROP OUTLIERS AND LOW READ SAMPLES"
 echo "Running on 16S data"
+
+# Input information: 
+# -a: amplicon type [options: 16S or ITS]
+# -n: your last name, used for naming output files so we know who ran the script
+# -e: Do you want to edit the metadata table to reflect which samples have been dropped and for what reason? [options: Y or N]
+# -p: path to where outputs should be saved
+# -m: path to metadata file, see documentation
+# -s: path to script directory
+# -t: path to file with filter thresholds table, see documentation
+# -o: path to file with outlier sample names list, see documentation
+
 Rscript $script_dir/03_Filter_Samples/03_c_drop_outliers_and_low_read_count_samples.R \
-	-a "16S" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-e "Y" \ # Do you want to edit the metadata table to reflect which samples have been dropped and for what reason? [options: Y or N]
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "16S" \
+	-n "atherton" \
+	-e "Y" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir \
-	-t <path to file with filter thresholds table> \ # see documentation
-	-o <path to file with outlier sample names list> \ # see documentation
+	-t <path to file with filter thresholds table> \
+	-o <path to file with outlier sample names list>
 	
 echo "Running on ITS data"
 Rscript $script_dir/03_Filter_Samples/03_c_drop_outliers_and_low_read_count_samples.R \
-	-a "ITS" \ # amplicon type [options: 16S or ITS]
-	-n "atherton" \ # your last name, used for naming output files so we know who ran the script
-	-e "Y" \ # Do you want to edit the metadata table to reflect which samples have been dropped and for what reason? [options: Y or N]
-	-p $project_dir \ # path to where outputs should be saved
-	-m <path to metadata file> \ # see documentation
+	-a "ITS" \
+	-n "atherton" \
+	-e "Y" \
+	-p $project_dir \
+	-m <path to metadata file> \
 	-s $script_dir \
-	-t <path to file with filter thresholds table> \ # see documentation
-	-o <path to file with outlier sample names list> \ # see documentation
+	-t <path to file with filter thresholds table> \
+	-o <path to file with outlier sample names list>
 
 echo "Done."
