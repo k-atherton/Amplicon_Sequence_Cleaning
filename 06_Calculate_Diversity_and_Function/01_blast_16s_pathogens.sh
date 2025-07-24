@@ -7,7 +7,7 @@
 #$ -j y
 
 # Specify the output file name
-#$ -o Bash_Outputs/M-BUDS_ED_atherton_blast_bacteria_pathogens_output.txt
+#$ -o blast_bacteria_pathogens_output.txt
 
 # Request more cores and memory
 #$ -pe omp 8
