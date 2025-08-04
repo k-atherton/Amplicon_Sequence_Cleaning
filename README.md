@@ -27,7 +27,7 @@ To run this pipeline, you will need the following R packages (in parentheses are
 ## Workflow
 ### Step 1: Run DADA2
 **Filename: `01_DADA2/01_bu16s_example_inputs.sh`**
-- Summary: This script will run BU16S, a pipeline that runs DADA2 to perform quality control on your samples and then assign taxonomy. 
+- Summary: This script will run BU16S-ITS, a pipeline that runs DADA2 to perform quality control on your samples and then assign taxonomy. 
 - Required inputs:
   - project name + run ID (example: M-BUDS_Run1)
   - path to directory where the sequencing run fastq files are
