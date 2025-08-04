@@ -1,4 +1,4 @@
-# Amplicon Sequence Cleaning Workflow
+# A DNA Amplicon Sequence Data Processing and Analysis Pipeline for Environmental Microbiomes
 by Kathryn Atherton
 
 The purpose of this project is to document the amplicon sequence cleaning process and decisions that I use in my research so that others can reproduce this process on my data or on their own datasets. 
